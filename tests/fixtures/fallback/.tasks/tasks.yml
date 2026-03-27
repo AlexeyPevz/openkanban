@@ -1,0 +1,4 @@
+tasks:
+  - id: fallback-task-001
+    title: Legacy YAML task
+    status: planned

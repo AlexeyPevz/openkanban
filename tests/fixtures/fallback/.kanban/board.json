@@ -1,0 +1,6 @@
+{
+  "board": {
+    "id": "fallback-board",
+    "columns": ["planned", "active", "review", "done"]
+  }
+}

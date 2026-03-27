@@ -1,0 +1,12 @@
+board:
+  id: canonical-board
+  title: Canonical Board
+  columns:
+    - id: planned
+      title: Planned
+    - id: active
+      title: Active
+    - id: review
+      title: Review
+    - id: done
+      title: Done
