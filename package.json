@@ -11,6 +11,10 @@
     "build": "npm run build:core && npm run build:plugin",
     "build:core": "npm run build -w @neon-tiger/core",
     "build:plugin": "npm run build -w @neon-tiger/plugin",
+    "build:sidecar": "npm run build -w packages/sidecar",
+    "build:desktop": "npm run build -w packages/desktop",
+    "dev:desktop": "npm run dev -w packages/desktop",
+    "build:all": "npm run build:core && npm run build:plugin && npm run build:sidecar",
     "test": "vitest run",
     "typecheck": "tsc -b"
   },
