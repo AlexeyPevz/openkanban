@@ -1,5 +1,7 @@
 import * as readline from 'node:readline';
 import type { MethodRegistry } from './methods/index.js';
+import { FileWatcher } from './watcher.js';
+import { sendNotification } from './notifications.js';
 
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -42,9 +44,48 @@ export function createRpcDispatcher(
   };
 }
 
-export function startServer(methods: MethodRegistry): void {
+export interface StartServerOptions {
+  methods: MethodRegistry;
+  projectDir?: string;
+  watch?: boolean;
+}
+
+function isOptions(v: unknown): v is StartServerOptions {
+  return v !== null && typeof v === 'object' && 'methods' in v
+    && typeof (v as Record<string, unknown>)['methods'] === 'object'
+    && (v as Record<string, unknown>)['methods'] !== null
+    && !('jsonrpc' in (v as Record<string, unknown>));
+}
+
+export function startServer(input: MethodRegistry | StartServerOptions): void {
+  let methods: MethodRegistry;
+  let projectDir: string | undefined;
+  let enableWatch: boolean | undefined;
+
+  if (isOptions(input)) {
+    methods = input.methods;
+    projectDir = input.projectDir;
+    enableWatch = input.watch;
+  } else {
+    methods = input;
+  }
   const dispatch = createRpcDispatcher(methods);
   const rl = readline.createInterface({ input: process.stdin });
+
+  // Start file watcher if projectDir is provided and watch is enabled
+  let watcher: FileWatcher | undefined;
+  if (projectDir && enableWatch !== false) {
+    watcher = new FileWatcher({
+      projectDir,
+      onTaskChanged: (taskId, changeType) => {
+        sendNotification('task.changed', { taskId, changeType });
+      },
+      onBoardChanged: () => {
+        sendNotification('board.changed', {});
+      },
+    });
+    watcher.start();
+  }
 
   rl.on('line', async (line) => {
     try {
@@ -59,6 +100,13 @@ export function startServer(methods: MethodRegistry): void {
         error: { code: -32700, message: 'Parse error' },
       };
       process.stdout.write(JSON.stringify(errorResponse) + '\n');
+    }
+  });
+
+  // Graceful shutdown
+  rl.on('close', async () => {
+    if (watcher) {
+      await watcher.stop();
     }
   });
 }
