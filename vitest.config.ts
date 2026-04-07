@@ -10,6 +10,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@neon-tiger/core": resolve(__dirname, "packages/core/src/index.ts"),
+      '@neon-tiger/sidecar': resolve(__dirname, 'packages/sidecar/src/index.ts'),
       "@neon-tiger/plugin": resolve(__dirname, "packages/plugin/src/plugin.ts"),
     },
   },
