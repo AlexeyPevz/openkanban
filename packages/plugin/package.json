@@ -1,5 +1,21 @@
 {
   "name": "@neon-tiger/plugin",
   "version": "0.1.0",
-  "private": true
+  "type": "module",
+  "main": "./dist/plugin.js",
+  "types": "./dist/plugin.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/plugin.d.ts",
+      "default": "./dist/plugin.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@neon-tiger/core": "*",
+    "@opencode-ai/plugin": "^1.3.2"
+  }
 }
