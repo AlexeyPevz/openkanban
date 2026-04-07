@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import type { SourceCandidate } from "../../../src/discovery/list-source-candidates"
-import { selectPrimarySource } from "../../../src/discovery/select-primary-source"
+import type { SourceCandidate } from "@neon-tiger/core"
+import { selectPrimarySource } from "@neon-tiger/core"
 
 function createCandidate(input: Partial<SourceCandidate> & Pick<SourceCandidate, "kind" | "path" | "priority">): SourceCandidate {
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { probeCapabilities } from "../../../../src/host/opencode/probe-capabilities"
+import { probeCapabilities } from "../../../../packages/plugin/src/host/probe-capabilities"
 
 describe("host/opencode probe-capabilities", () => {
   it("records evidence for each host surface instead of hardcoding support", async () => {

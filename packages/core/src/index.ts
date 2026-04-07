@@ -65,6 +65,10 @@ export type { CreateTaskRequest } from "./repository/write/create-task.js"
 export { updateTask } from "./repository/write/update-task.js"
 export { updateTaskStatus } from "./repository/write/update-task-status.js"
 
+export { KanbanJsonRepository } from "./repository/fallback/kanban-json-repository.js"
+export { MarkdownGlobRepository } from "./repository/fallback/markdown-glob-repository.js"
+export { TasksYmlRepository } from "./repository/fallback/tasks-yml-repository.js"
+
 // === Status & Transitions ===
 export { canTransition } from "./status/transition.js"
 

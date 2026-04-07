@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { publishTaskEvent } from "../../../src/bridge/orchestrator/publish-task-event"
-import type { TaskEvent } from "../../../src/core/types"
+import { publishTaskEvent, type TaskEvent } from "@neon-tiger/core"
 
 const event: TaskEvent = {
   event_id: "evt-001",

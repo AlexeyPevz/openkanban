@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { runPreflight } from "../../../src/core/preflight/run-preflight"
+import { runPreflight } from "@neon-tiger/core"
 
 describe("core/preflight", () => {
   it("blocks planned to active when title missing", () => {

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url"
 
 import { describe, expect, it } from "vitest"
 
-import { listSourceCandidates } from "../../../src/discovery/list-source-candidates"
+import { listSourceCandidates } from "@neon-tiger/core"
 
 const fixturesRoot = resolve(fileURLToPath(new URL("../../fixtures", import.meta.url)))
 

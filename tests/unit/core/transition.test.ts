@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { TaskStatusSchema } from "../../../src/core/schemas"
-import { enforceKanbanContract } from "../../../src/core/contract/enforce-kanban"
-import { canTransition } from "../../../src/core/status/transition"
+import { TaskStatusSchema, enforceKanbanContract, canTransition } from "@neon-tiger/core"
 
 const baseTask = {
   id: "task-001",

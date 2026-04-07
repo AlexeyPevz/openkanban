@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { TaskEventSchema } from "../../../src/core/schemas"
-import { createTaskEvent } from "../../../src/core/events/task-event"
+import { TaskEventSchema, createTaskEvent } from "@neon-tiger/core"
 
 describe("core/task-event", () => {
   it("event payload matches expected shape", () => {

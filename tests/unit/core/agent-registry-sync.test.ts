@@ -4,9 +4,10 @@ import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { mergeAgentSources } from "../../../src/core/agents/merge-agent-sources"
-import { resolveAgentRegistry, saveAdHocAgent } from "../../../src/core/agents/resolve-agent-registry"
-import { BoardYamlRepository } from "../../../src/repository/canonical/board-yaml-repository"
+import { mergeAgentSources, resolveAgentRegistry, BoardYamlRepository } from "@neon-tiger/core"
+
+// saveAdHocAgent is not exported from barrel — import directly
+import { saveAdHocAgent } from "../../../packages/core/src/agents/resolve-agent-registry"
 
 describe("core/agent registry sync", () => {
   let rootDir: string

@@ -3,11 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { BoardYamlRepository } from "../../../src/repository/canonical/board-yaml-repository"
-import { TaskMarkdownRepository } from "../../../src/repository/canonical/task-markdown-repository"
-import { createTask } from "../../../src/repository/write/create-task"
-import { updateTask } from "../../../src/repository/write/update-task"
-import { updateTaskStatus } from "../../../src/repository/write/update-task-status"
+import { BoardYamlRepository, TaskMarkdownRepository, createTask, updateTask, updateTaskStatus } from "@neon-tiger/core"
 
 async function createCanonicalWorkspace(rootDir: string) {
   const tasksDir = join(rootDir, ".tasks", "tasks")
