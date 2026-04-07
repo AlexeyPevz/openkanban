@@ -12,13 +12,13 @@ export function makeListTasksHandler(taskRepository: TaskRepository) {
     let tasks = await taskRepository.loadTasks()
 
     if (filter.status) {
-      tasks = tasks.filter((t) => t.status === filter.status)
+      tasks = tasks.filter((t: TaskCard) => t.status === filter.status)
     }
     if (filter.priority) {
-      tasks = tasks.filter((t) => t.priority === filter.priority)
+      tasks = tasks.filter((t: TaskCard) => t.priority === filter.priority)
     }
     if (filter.assignee) {
-      tasks = tasks.filter((t) => t.assignees?.includes(filter.assignee!))
+      tasks = tasks.filter((t: TaskCard) => t.assignees?.includes(filter.assignee!))
     }
 
     return JSON.stringify(tasks, null, 2)
