@@ -8,9 +8,8 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "composite": true,
+    "declaration": false,
+    "declarationMap": false,
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node"]
