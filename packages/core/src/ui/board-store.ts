@@ -1,5 +1,7 @@
 import type { TaskCard } from "../types.js"
 import type { Board } from "../repository/contracts.js"
+import type { ResourceAssignment } from "../resources/types.js"
+import { normalizeResources } from "../resources/normalize.js"
 import { BoardYamlRepository } from "../repository/canonical/board-yaml-repository.js"
 import {
   loadCanonicalTasksWithDiagnostics,
@@ -43,4 +45,12 @@ export function getTaskAgents(task: TaskCard): string[] {
 
 export function hasTaskBlocker(task: TaskCard): boolean {
   return task.status === "blocked" || typeof task.blocked_reason === "string"
+}
+
+export function getTaskResources(task: TaskCard): ResourceAssignment[] {
+  return normalizeResources(
+    task.resources,
+    task.required_agents,
+    task.required_skills,
+  )
 }
