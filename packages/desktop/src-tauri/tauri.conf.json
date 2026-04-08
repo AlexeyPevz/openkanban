@@ -1,7 +1,7 @@
 {
   "identifier": "com.openkanban.desktop",
   "build": {
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run build && npm run bundle:sidecar",
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
@@ -23,6 +23,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": []
+    "icon": [],
+    "resources": [
+      "../../../packages/sidecar/dist/sidecar-bundle.mjs"
+    ]
   }
 }

@@ -17,11 +17,10 @@ import { createResourceMethods } from './methods/resources.js';
 
 if (process.argv[1] === import.meta.filename) {
   const projectDir = process.cwd();
-  const tasksDir = `${projectDir}/.tasks`;
 
   const methods = {
-    ...createBoardMethods(tasksDir),
-    ...createTaskMethods(tasksDir),
+    ...createBoardMethods(projectDir),
+    ...createTaskMethods(projectDir),
     ...createResourceMethods(projectDir),
   };
 

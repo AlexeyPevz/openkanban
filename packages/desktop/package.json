@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "bundle:sidecar": "npx esbuild ../../packages/sidecar/dist/index.js --bundle --platform=node --format=esm --outfile=../../packages/sidecar/dist/sidecar-bundle.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

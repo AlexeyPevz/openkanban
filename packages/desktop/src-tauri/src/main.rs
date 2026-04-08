@@ -4,16 +4,30 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 struct SidecarState {
     child: Mutex<Option<Child>>,
     stdin_lock: Mutex<()>,
 }
 
-fn start_sidecar() -> Result<Child, String> {
+fn resolve_sidecar_path(app: &tauri::App) -> Result<String, Box<dyn std::error::Error>> {
+    if cfg!(debug_assertions) {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let sidecar_path = std::path::Path::new(manifest_dir)
+            .join("../../../packages/sidecar/dist/index.js")
+            .canonicalize()?;
+        Ok(sidecar_path.to_string_lossy().to_string())
+    } else {
+        let resource_dir = app.path().resource_dir()?;
+        let sidecar_path = resource_dir.join("sidecar-bundle.mjs");
+        Ok(sidecar_path.to_string_lossy().to_string())
+    }
+}
+
+fn start_sidecar(sidecar_path: &str) -> Result<Child, String> {
     Command::new("node")
-        .arg("packages/sidecar/dist/index.js")
+        .arg(sidecar_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -98,19 +112,27 @@ async fn rpc_call(
 }
 
 fn main() {
-    let mut sidecar = start_sidecar().expect("Failed to start sidecar");
-
-    let stdout = sidecar.stdout.take().expect("No sidecar stdout");
-
     let (response_tx, response_rx) = std::sync::mpsc::channel::<serde_json::Value>();
 
     tauri::Builder::default()
         .manage(SidecarState {
-            child: Mutex::new(Some(sidecar)),
+            child: Mutex::new(None),
             stdin_lock: Mutex::new(()),
         })
         .manage(Mutex::new(response_rx))
         .setup(move |app| {
+            let sidecar_path = resolve_sidecar_path(app)?;
+
+            let mut sidecar = start_sidecar(&sidecar_path).map_err(|e| {
+                Box::new(std::io::Error::new(std::io::ErrorKind::Other, e))
+                    as Box<dyn std::error::Error>
+            })?;
+
+            let stdout = sidecar.stdout.take().expect("No sidecar stdout");
+
+            let state: State<SidecarState> = app.state();
+            *state.child.lock().unwrap() = Some(sidecar);
+
             spawn_event_bridge(app.handle().clone(), stdout, response_tx);
             Ok(())
         })
