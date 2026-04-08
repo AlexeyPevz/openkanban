@@ -1,3 +1,6 @@
+import opencodePreset from '../themes/opencode.json';
+import lightPreset from '../themes/light.json';
+
 export interface ThemeVars {
   '--kanban-bg': string;
   '--kanban-column-bg': string;
@@ -12,21 +15,18 @@ export interface ThemeVars {
   '--kanban-shadow': string;
 }
 
-const defaultTheme: ThemeVars = {
-  '--kanban-bg': '#1a1b26',
-  '--kanban-column-bg': '#24283b',
-  '--kanban-card-bg': '#2f3549',
-  '--kanban-card-border': '#414868',
-  '--kanban-text': '#c0caf5',
-  '--kanban-text-secondary': '#565f89',
-  '--kanban-accent': '#7aa2f7',
-  '--kanban-danger': '#f7768e',
-  '--kanban-success': '#9ece6a',
-  '--kanban-radius': '8px',
-  '--kanban-shadow': '0 2px 8px rgba(0,0,0,0.3)',
-};
+export interface ThemePreset {
+  name: string;
+  label: string;
+  vars: ThemeVars;
+}
 
-let currentTheme = $state<ThemeVars>({ ...defaultTheme });
+export const presets: ThemePreset[] = [
+  opencodePreset as ThemePreset,
+  lightPreset as ThemePreset,
+];
+
+let currentTheme = $state<ThemeVars>({ ...(opencodePreset.vars as ThemeVars) });
 let themeName = $state('opencode');
 
 export function getTheme(): ThemeVars {
@@ -46,5 +46,19 @@ export function applyTheme(vars: ThemeVars, name?: string): void {
 }
 
 export function resetTheme(): void {
-  applyTheme({ ...defaultTheme }, 'opencode');
+  applyTheme({ ...(opencodePreset.vars as ThemeVars) }, 'opencode');
+}
+
+export function loadPreset(name: string): void {
+  const preset = presets.find((p) => p.name === name);
+  if (preset) {
+    applyTheme({ ...preset.vars }, preset.name);
+  }
+}
+
+export function toggleTheme(): void {
+  const currentIndex = presets.findIndex((p) => p.name === themeName);
+  const nextIndex = (currentIndex + 1) % presets.length;
+  const next = presets[nextIndex];
+  applyTheme({ ...next.vars }, next.name);
 }

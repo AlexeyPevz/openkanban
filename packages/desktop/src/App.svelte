@@ -1,8 +1,33 @@
 <script lang="ts">
-  // Board component will be added in T10-T11
+  import Board from './lib/components/Board.svelte';
+  import ShortcutsHelp from './lib/components/ShortcutsHelp.svelte';
+  import { loadPreset, getThemeName, toggleTheme } from './lib/stores/theme.svelte.js';
+  import { shortcuts } from './lib/actions/shortcuts.js';
+  import { onMount } from 'svelte';
+
+  let showShortcuts = $state(false);
+
+  onMount(() => {
+    loadPreset('opencode');
+  });
+
+  const globalKeymap = {
+    '?': () => { showShortcuts = !showShortcuts; },
+    t: () => { toggleTheme(); },
+  };
 </script>
 
-<main>
-  <h1>OpenKanban</h1>
-  <p>Desktop scaffold ready. Board UI coming in T10-T11.</p>
-</main>
+<div id="app-root" use:shortcuts={globalKeymap}>
+  <Board />
+
+  {#if showShortcuts}
+    <ShortcutsHelp onClose={() => { showShortcuts = false; }} />
+  {/if}
+</div>
+
+<style>
+  #app-root {
+    height: 100vh;
+    width: 100vw;
+  }
+</style>
