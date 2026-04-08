@@ -5,6 +5,13 @@
   let task = $derived(getSelectedTask());
   let resources = $derived(task ? getTaskResources(task) : []);
 
+  let closeBtn: HTMLButtonElement;
+
+  // Auto-focus close button when task panel opens
+  $effect(() => {
+    if (task) closeBtn?.focus();
+  });
+
   function close() {
     selectTask(null);
   }
@@ -23,7 +30,7 @@
   >
     <div class="details-header">
       <h2>{task.title}</h2>
-      <button class="close-btn" onclick={close} aria-label="Close details">×</button>
+      <button class="close-btn" bind:this={closeBtn} onclick={close} aria-label="Close details">×</button>
     </div>
 
     <div class="details-body">
@@ -121,6 +128,11 @@
     font-size: 1.5rem;
     color: var(--kanban-text-secondary);
     cursor: pointer;
+  }
+
+  .close-btn:focus-visible {
+    outline: 2px solid var(--kanban-accent);
+    outline-offset: 2px;
   }
 
   .field {

@@ -5,6 +5,7 @@
     getBoardState,
   } from '../stores/board.svelte.js';
   import { getResources } from '../stores/resources.svelte.js';
+  import { onMount } from 'svelte';
   import type { ResourceAssignment } from '@neon-tiger/core';
 
   interface Props {
@@ -13,6 +14,8 @@
   }
 
   let { taskId, onClose }: Props = $props();
+
+  let formEl: HTMLFormElement;
 
   let existingTask = $derived(
     taskId && getBoardState().state === 'success'
@@ -83,6 +86,43 @@
   function isResourceSelected(kind: string, name: string): boolean {
     return selectedResources.some((r) => r.kind === kind && r.name === name);
   }
+
+  onMount(() => {
+    if (!formEl) return;
+
+    const focusableSelector =
+      'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    const getFocusable = () =>
+      Array.from(formEl.querySelectorAll<HTMLElement>(focusableSelector));
+
+    // Focus first input on mount
+    const focusable = getFocusable();
+    if (focusable.length > 0) {
+      focusable[0].focus();
+    }
+
+    function handleKeydown(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return;
+
+      const items = getFocusable();
+      if (items.length === 0) return;
+
+      const first = items[0];
+      const last = items[items.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    formEl.addEventListener('keydown', handleKeydown);
+    return () => formEl.removeEventListener('keydown', handleKeydown);
+  });
 </script>
 
 <div
@@ -92,7 +132,7 @@
   role="dialog"
   aria-label="{isEdit ? 'Edit' : 'Create'} task"
 >
-  <form class="task-form" onclick={(e) => e.stopPropagation()} onsubmit={handleSubmit}>
+  <form class="task-form" bind:this={formEl} onclick={(e) => e.stopPropagation()} onsubmit={handleSubmit}>
     <h2>{isEdit ? 'Edit Task' : 'New Task'}</h2>
 
     <div class="form-field">
@@ -254,5 +294,11 @@
     border-radius: 4px;
     cursor: pointer;
     font-weight: 600;
+  }
+
+  .cancel-btn:focus-visible,
+  .submit-btn:focus-visible {
+    outline: 2px solid var(--kanban-accent);
+    outline-offset: 2px;
   }
 </style>

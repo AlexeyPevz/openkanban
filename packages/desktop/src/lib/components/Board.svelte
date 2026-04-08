@@ -116,6 +116,11 @@
     font-weight: 600;
   }
 
+  .new-task-btn:focus-visible {
+    outline: 2px solid var(--kanban-accent);
+    outline-offset: 2px;
+  }
+
   .columns {
     display: flex;
     gap: 16px;

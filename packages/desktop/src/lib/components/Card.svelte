@@ -173,4 +173,9 @@
     color: var(--kanban-text);
     border-color: var(--kanban-accent);
   }
+
+  .edit-btn:focus-visible {
+    outline: 2px solid var(--kanban-accent);
+    outline-offset: 2px;
+  }
 </style>

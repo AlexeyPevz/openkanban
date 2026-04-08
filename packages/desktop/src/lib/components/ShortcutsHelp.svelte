@@ -1,9 +1,13 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+
   interface Props {
     onClose: () => void;
   }
 
   let { onClose }: Props = $props();
+
+  let panelEl: HTMLDivElement;
 
   const shortcutsList = [
     { key: 'n', description: 'New task' },
@@ -15,6 +19,43 @@
     { key: 'k', description: 'Previous card' },
     { key: 'Ctrl+z', description: 'Undo last action' },
   ];
+
+  onMount(() => {
+    if (!panelEl) return;
+
+    const focusableSelector =
+      'button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    const getFocusable = () =>
+      Array.from(panelEl.querySelectorAll<HTMLElement>(focusableSelector));
+
+    // Focus the Close button on mount
+    const focusable = getFocusable();
+    if (focusable.length > 0) {
+      focusable[focusable.length - 1].focus(); // Close button is last
+    }
+
+    function handleKeydown(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return;
+
+      const items = getFocusable();
+      if (items.length === 0) return;
+
+      const first = items[0];
+      const last = items[items.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    panelEl.addEventListener('keydown', handleKeydown);
+    return () => panelEl.removeEventListener('keydown', handleKeydown);
+  });
 </script>
 
 <div
@@ -24,7 +65,7 @@
   role="dialog"
   aria-label="Keyboard shortcuts"
 >
-  <div class="shortcuts-panel" onclick={(e) => e.stopPropagation()}>
+  <div class="shortcuts-panel" bind:this={panelEl} onclick={(e) => e.stopPropagation()}>
     <h2>Keyboard Shortcuts</h2>
     <div class="shortcuts-list">
       {#each shortcutsList as shortcut}
@@ -95,5 +136,10 @@
     border-radius: var(--kanban-radius);
     cursor: pointer;
     width: 100%;
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--kanban-accent);
+    outline-offset: 2px;
   }
 </style>
