@@ -1,11 +1,16 @@
 import { defineConfig } from "vitest/config"
 import { resolve } from "node:path"
+import { svelte } from "@sveltejs/vite-plugin-svelte"
 
 export default defineConfig({
+  plugins: [svelte({ hot: false })],
   test: {
     include: ["tests/**/*.test.ts"],
     environment: "node",
-    environmentMatchGlobs: [["tests/ui/**/*.test.ts", "happy-dom"]],
+    environmentMatchGlobs: [
+      ["tests/ui/**/*.test.ts", "happy-dom"],
+      ["**/tests/desktop/stores*.test.ts", "happy-dom"],
+    ],
   },
   resolve: {
     alias: {
