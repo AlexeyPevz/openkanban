@@ -87,6 +87,7 @@ function toFrontmatterTask(input: TaskCard): Record<string, unknown> {
     required_skills: input.required_skills ?? [],
     artifacts: input.artifacts ?? [],
     ...(input.blocked_reason ? { blocked_reason: input.blocked_reason } : {}),
+    ...(input.resources && input.resources.length > 0 ? { resources: input.resources } : {}),
     metadata: input.metadata ?? {},
   }
 }

@@ -25,8 +25,8 @@ function resolveBinaryPath(): string | null {
   // For now, check well-known locations
   const home = homedir()
   const candidates = [
-    join(home, ".neon-tiger", "bin", "neon-tiger-desktop"),
-    join(home, ".neon-tiger", "bin", "neon-tiger-desktop.exe"),
+    join(home, ".openkanban", "bin", "openkanban-desktop"),
+    join(home, ".openkanban", "bin", "openkanban-desktop.exe"),
   ]
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate

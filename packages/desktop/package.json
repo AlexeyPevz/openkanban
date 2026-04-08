@@ -1,0 +1,22 @@
+{
+  "name": "@neon-tiger/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "bundle:sidecar": "npx esbuild ../../packages/sidecar/dist/index.js --bundle --platform=node --format=esm --outfile=../../packages/sidecar/dist/sidecar-bundle.mjs",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@tauri-apps/cli": "^2.0.0",
+    "svelte": "^5.0.0",
+    "vite": "^6.0.0"
+  }
+}

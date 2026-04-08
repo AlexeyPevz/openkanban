@@ -1,0 +1,44 @@
+:root {
+  --kanban-bg: #1a1b26;
+  --kanban-column-bg: #24283b;
+  --kanban-card-bg: #2f3549;
+  --kanban-card-border: #414868;
+  --kanban-text: #c0caf5;
+  --kanban-text-secondary: #565f89;
+  --kanban-accent: #7aa2f7;
+  --kanban-danger: #f7768e;
+  --kanban-success: #9ece6a;
+  --kanban-radius: 8px;
+  --kanban-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--kanban-bg);
+  color: var(--kanban-text);
+  min-height: 100vh;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--kanban-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

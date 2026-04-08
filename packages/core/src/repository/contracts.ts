@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { TaskCardSchema, TaskStatusSchema } from "../schemas.js"
 import type { TaskCard, TaskStatus } from "../types.js"
+import type { ResourceAssignment } from "../resources/types.js"
 
 export const BoardColumnSchema = z.object({
   id: z.string().min(1),
@@ -49,6 +50,7 @@ export interface TaskPatch {
   metadata?: Record<string, unknown>
   blocked_reason?: string
   updated_at?: string
+  resources?: ResourceAssignment[]
 }
 
 export interface CreateTaskInput {
@@ -59,6 +61,7 @@ export interface CreateTaskInput {
   updated_at: string
   required_agents?: string[]
   required_skills?: string[]
+  resources?: ResourceAssignment[]
   artifacts?: string[]
   blocked_reason?: string
   metadata?: Record<string, unknown>

@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { ResourceAssignmentSchema } from "./resources/schemas.js"
 import { TASK_EVENT_PREFLIGHT_RESULTS, TASK_STATUSES } from "./types.js"
 
 export const TaskStatusSchema = z.enum(TASK_STATUSES)
@@ -17,6 +18,7 @@ export const TaskCardSchema = z.object({
   assignees: z.array(z.string()).default([]),
   required_agents: z.array(z.string()).default([]),
   required_skills: z.array(z.string()).default([]),
+  resources: z.array(ResourceAssignmentSchema).default([]),
   progress: z.number().default(0),
   artifacts: z.array(z.string()).default([]),
   blocked_reason: z.string().optional(),

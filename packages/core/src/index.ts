@@ -107,3 +107,10 @@ export {
   hasTaskBlocker,
 } from "./ui/board-store.js"
 export type { BoardDiagnostic, BoardViewState } from "./ui/board-store.js"
+
+// Resources
+export type { ResourceKind, ResourceRecord, ResourceAssignment } from './resources/types.js';
+export { ResourceKindSchema, ResourceRecordSchema, ResourceAssignmentSchema } from './resources/schemas.js';
+export { normalizeResources } from './resources/normalize.js';
+export { createResourceRegistry, type ResourceRegistry } from './resources/registry.js';
+export { getTaskResources } from './ui/board-store.js';

@@ -16,7 +16,7 @@ export function makeOpenBoardHandler(deps: OpenBoardDeps) {
 
     const binary = await deps.resolveBinary()
     if (!binary) {
-      return "neon-tiger-desktop binary not found. Install it from GitHub Releases or set desktopBinaryPath in plugin config."
+      return "openkanban-desktop binary not found. Install it from GitHub Releases or set desktopBinaryPath in plugin config."
     }
 
     deps.spawnDetached(binary, ["--directory", deps.directory])

@@ -1,3 +1,5 @@
+import type { ResourceAssignment, ResourceRecord } from "./resources/types.js"
+
 export const TASK_STATUSES = [
   "planned",
   "active",
@@ -21,6 +23,7 @@ export interface TaskCard {
   assignees?: string[]
   required_agents?: string[]
   required_skills?: string[]
+  resources?: ResourceAssignment[]
   progress?: number
   artifacts?: string[]
   blocked_reason?: string
@@ -38,6 +41,7 @@ export interface PreflightInput {
   targetStatus: TaskStatus
   availableAgents?: string[]
   availableSkills?: string[]
+  availableResources?: ResourceRecord[]
   gateResults?: GateResult[]
 }
 

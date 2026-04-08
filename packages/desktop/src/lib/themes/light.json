@@ -1,0 +1,17 @@
+{
+  "name": "light",
+  "label": "Light",
+  "vars": {
+    "--kanban-bg": "#f5f5f5",
+    "--kanban-column-bg": "#ffffff",
+    "--kanban-card-bg": "#ffffff",
+    "--kanban-card-border": "#e0e0e0",
+    "--kanban-text": "#1a1a1a",
+    "--kanban-text-secondary": "#666666",
+    "--kanban-accent": "#2563eb",
+    "--kanban-danger": "#dc2626",
+    "--kanban-success": "#16a34a",
+    "--kanban-radius": "8px",
+    "--kanban-shadow": "0 2px 8px rgba(0,0,0,0.08)"
+  }
+}
