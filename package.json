@@ -6,7 +6,8 @@
   "workspaces": [
     "packages/core",
     "packages/plugin",
-    "packages/sidecar"
+    "packages/sidecar",
+    "packages/desktop"
   ],
   "scripts": {
     "build": "npm run build:core && npm run build:plugin",
