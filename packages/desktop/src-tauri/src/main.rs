@@ -1,14 +1,32 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::io::{BufRead, BufReader, Write};
+use std::collections::HashMap;
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 struct SidecarState {
     child: Mutex<Option<Child>>,
     stdin_lock: Mutex<()>,
+    pending_requests: Arc<Mutex<HashMap<u64, std::sync::mpsc::Sender<serde_json::Value>>>>,
+    next_request_id: AtomicU64,
+}
+
+fn next_request_id(counter: &AtomicU64) -> u64 {
+    counter.fetch_add(1, Ordering::Relaxed) + 1
+}
+
+fn extract_request_id(value: &serde_json::Value) -> Option<u64> {
+    value
+        .get("id")
+        .and_then(|id| match id {
+            serde_json::Value::Number(n) => n.as_u64(),
+            serde_json::Value::String(s) => s.parse::<u64>().ok(),
+            _ => None,
+        })
 }
 
 fn resolve_sidecar_path(app: &tauri::App) -> Result<String, Box<dyn std::error::Error>> {
@@ -42,7 +60,7 @@ fn start_sidecar(sidecar_path: &str) -> Result<Child, String> {
 fn spawn_event_bridge(
     app_handle: AppHandle,
     stdout: std::process::ChildStdout,
-    response_tx: std::sync::mpsc::Sender<serde_json::Value>,
+    pending_requests: Arc<Mutex<HashMap<u64, std::sync::mpsc::Sender<serde_json::Value>>>>,
 ) {
     thread::spawn(move || {
         let reader = BufReader::new(stdout);
@@ -59,8 +77,15 @@ fn spawn_event_bridge(
                 Err(_) => continue,
             };
 
-            if parsed.get("id").is_some() {
-                let _ = response_tx.send(parsed);
+            if let Some(request_id) = extract_request_id(&parsed) {
+                let pending_tx = match pending_requests.lock() {
+                    Ok(mut pending) => pending.remove(&request_id),
+                    Err(_) => None,
+                };
+
+                if let Some(tx) = pending_tx {
+                    let _ = tx.send(parsed);
+                }
             } else if let Some(method) = parsed.get("method").and_then(|m| m.as_str()) {
                 let data = parsed.get("params").cloned().unwrap_or(serde_json::Value::Null);
                 let event_name = format!("sidecar:{}", method);
@@ -73,33 +98,57 @@ fn spawn_event_bridge(
 #[tauri::command]
 async fn rpc_call(
     state: State<'_, SidecarState>,
-    response_rx: State<'_, Mutex<std::sync::mpsc::Receiver<serde_json::Value>>>,
     method: String,
     params: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
-    let _stdin_guard = state.stdin_lock.lock().map_err(|e| e.to_string())?;
+    let request_id = next_request_id(&state.next_request_id);
+    let (response_tx, response_rx) = std::sync::mpsc::channel::<serde_json::Value>();
 
-    let mut guard = state.child.lock().map_err(|e| e.to_string())?;
-    let child = guard.as_mut().ok_or("Sidecar not running")?;
+    {
+        let mut pending = state.pending_requests.lock().map_err(|e| e.to_string())?;
+        pending.insert(request_id, response_tx);
+    }
 
-    let request = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": method,
-        "params": params,
-    });
+    let write_result: Result<(), String> = (|| {
+        let _stdin_guard = state.stdin_lock.lock().map_err(|e| e.to_string())?;
 
-    let stdin = child.stdin.as_mut().ok_or("No stdin")?;
-    let request_line = serde_json::to_string(&request).map_err(|e| e.to_string())?;
-    writeln!(stdin, "{}", request_line).map_err(|e| e.to_string())?;
-    stdin.flush().map_err(|e| e.to_string())?;
+        let mut guard = state.child.lock().map_err(|e| e.to_string())?;
+        let child = guard
+            .as_mut()
+            .ok_or_else(|| "Sidecar not running".to_string())?;
 
-    drop(guard);
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "method": method,
+            "params": params,
+        });
 
-    let rx = response_rx.lock().map_err(|e| e.to_string())?;
-    let response = rx
-        .recv_timeout(std::time::Duration::from_secs(10))
-        .map_err(|e| format!("RPC timeout: {}", e))?;
+        let stdin = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| "No stdin".to_string())?;
+        let request_line = serde_json::to_string(&request).map_err(|e| e.to_string())?;
+        writeln!(stdin, "{}", request_line).map_err(|e| e.to_string())?;
+        stdin.flush().map_err(|e| e.to_string())
+    })();
+
+    if let Err(err) = write_result {
+        if let Ok(mut pending) = state.pending_requests.lock() {
+            pending.remove(&request_id);
+        }
+        return Err(err);
+    }
+
+    let response = match response_rx.recv_timeout(std::time::Duration::from_secs(10)) {
+        Ok(value) => value,
+        Err(e) => {
+            if let Ok(mut pending) = state.pending_requests.lock() {
+                pending.remove(&request_id);
+            }
+            return Err(format!("RPC timeout: {}", e));
+        }
+    };
 
     if let Some(error) = response.get("error") {
         return Err(error.to_string());
@@ -112,14 +161,13 @@ async fn rpc_call(
 }
 
 fn main() {
-    let (response_tx, response_rx) = std::sync::mpsc::channel::<serde_json::Value>();
-
     tauri::Builder::default()
         .manage(SidecarState {
             child: Mutex::new(None),
             stdin_lock: Mutex::new(()),
+            pending_requests: Arc::new(Mutex::new(HashMap::new())),
+            next_request_id: AtomicU64::new(0),
         })
-        .manage(Mutex::new(response_rx))
         .setup(move |app| {
             let sidecar_path = resolve_sidecar_path(app)?;
 
@@ -131,9 +179,10 @@ fn main() {
             let stdout = sidecar.stdout.take().expect("No sidecar stdout");
 
             let state: State<SidecarState> = app.state();
+            let pending_requests = state.pending_requests.clone();
             *state.child.lock().unwrap() = Some(sidecar);
 
-            spawn_event_bridge(app.handle().clone(), stdout, response_tx);
+            spawn_event_bridge(app.handle().clone(), stdout, pending_requests);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![rpc_call])
@@ -144,4 +193,35 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn next_request_id_is_unique_and_monotonic() {
+        let counter = AtomicU64::new(0);
+
+        let first = next_request_id(&counter);
+        let second = next_request_id(&counter);
+        let third = next_request_id(&counter);
+
+        assert_eq!(first, 1);
+        assert_eq!(second, 2);
+        assert_eq!(third, 3);
+    }
+
+    #[test]
+    fn extract_request_id_supports_numeric_and_string_ids() {
+        let numeric = serde_json::json!({ "id": 42 });
+        let string = serde_json::json!({ "id": "77" });
+        let invalid = serde_json::json!({ "id": "invalid" });
+        let missing = serde_json::json!({ "jsonrpc": "2.0" });
+
+        assert_eq!(extract_request_id(&numeric), Some(42));
+        assert_eq!(extract_request_id(&string), Some(77));
+        assert_eq!(extract_request_id(&invalid), None);
+        assert_eq!(extract_request_id(&missing), None);
+    }
 }

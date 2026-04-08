@@ -76,6 +76,9 @@ describe('board store', () => {
     await loadBoard();
     const state = getBoardState();
     expect(state.state).toBe('error');
+    if (state.state === 'error') {
+      expect(state.message).toBe('connection lost');
+    }
   });
 
   it('selectTask updates selectedTaskId', () => {

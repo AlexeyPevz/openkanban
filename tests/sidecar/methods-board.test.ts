@@ -80,6 +80,12 @@ describe('task methods', () => {
     expect(tasks[0]).toMatchObject({ id: 'sample-task' });
   });
 
+  it('task.list rejects invalid params', async () => {
+    await expect(taskMethods['task.list']({ extra: true } as never)).rejects.toThrow(
+      'Invalid params for task.list',
+    );
+  });
+
   it('task.get returns specific task', async () => {
     const task = await taskMethods['task.get']({ id: 'sample-task' });
     expect(task).toMatchObject({
@@ -93,6 +99,12 @@ describe('task methods', () => {
     await expect(
       taskMethods['task.get']({ id: 'nonexistent' }),
     ).rejects.toThrow('Task not found: nonexistent');
+  });
+
+  it('task.get rejects invalid params', async () => {
+    await expect(taskMethods['task.get']({} as never)).rejects.toThrow(
+      'Invalid params for task.get',
+    );
   });
 
   it('task.create creates a new task', async () => {
@@ -111,6 +123,12 @@ describe('task methods', () => {
     expect(tasks).toHaveLength(2);
   });
 
+  it('task.create rejects invalid params', async () => {
+    await expect(
+      taskMethods['task.create']({ title: 'Bad status', status: 'invalid-status' } as never),
+    ).rejects.toThrow('Invalid params for task.create');
+  });
+
   it('task.move transitions status', async () => {
     const moved = await taskMethods['task.move']({
       id: 'sample-task',
@@ -123,6 +141,12 @@ describe('task methods', () => {
     await expect(
       taskMethods['task.move']({ id: 'sample-task', status: 'done' }),
     ).rejects.toThrow();
+  });
+
+  it('task.move rejects invalid params', async () => {
+    await expect(
+      taskMethods['task.move']({ id: 'sample-task', status: 'invalid-status' } as never),
+    ).rejects.toThrow('Invalid params for task.move');
   });
 
   it('task.update updates task metadata', async () => {

@@ -49,7 +49,7 @@
     </div>
   {:else if getBoardState().state === 'error'}
     <div class="board-error" role="alert">
-      <p>Error: {getBoardState().error}</p>
+      <p>Error: {getBoardState().message}</p>
       <button onclick={() => loadBoard()}>Retry</button>
     </div>
   {:else if getBoardState().state === 'success'}

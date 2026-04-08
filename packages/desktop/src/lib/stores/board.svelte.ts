@@ -22,7 +22,7 @@ export async function loadBoard(): Promise<void> {
   if (result.ok) {
     boardState = result.data;
   } else {
-    boardState = { state: 'error', error: result.error.message };
+    boardState = { state: 'error', message: result.error.message };
   }
 }
 

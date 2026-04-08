@@ -40,7 +40,7 @@ export interface BoardViewStateSuccess {
 export type BoardViewState =
   | { state: 'loading' }
   | { state: 'empty'; message: string }
-  | { state: 'error'; error: string }
+  | { state: 'error'; message: string }
   | BoardViewStateSuccess;
 
 export const boardApi = {
