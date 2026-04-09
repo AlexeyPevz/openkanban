@@ -95,6 +95,24 @@ fn spawn_event_bridge(
     });
 }
 
+fn spawn_stderr_logger(stderr: std::process::ChildStderr) {
+    thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines() {
+            match line {
+                Ok(message) if !message.trim().is_empty() => {
+                    eprintln!("[sidecar stderr] {}", message);
+                }
+                Ok(_) => {}
+                Err(err) => {
+                    eprintln!("[sidecar stderr read error] {}", err);
+                    break;
+                }
+            }
+        }
+    });
+}
+
 #[tauri::command]
 async fn rpc_call(
     state: State<'_, SidecarState>,
@@ -177,12 +195,14 @@ fn main() {
             })?;
 
             let stdout = sidecar.stdout.take().expect("No sidecar stdout");
+            let stderr = sidecar.stderr.take().expect("No sidecar stderr");
 
             let state: State<SidecarState> = app.state();
             let pending_requests = state.pending_requests.clone();
             *state.child.lock().unwrap() = Some(sidecar);
 
             spawn_event_bridge(app.handle().clone(), stdout, pending_requests);
+            spawn_stderr_logger(stderr);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![rpc_call])
