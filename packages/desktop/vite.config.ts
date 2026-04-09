@@ -4,6 +4,10 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 export default defineConfig({
   plugins: [svelte()],
   clearScreen: false,
+  // Tauri serves frontendDist assets via tauri://localhost — paths must be
+  // relative (./assets/…) rather than absolute (/assets/…) for the WebView
+  // to resolve them correctly.
+  base: './',
   server: {
     port: 1420,
     strictPort: true,
