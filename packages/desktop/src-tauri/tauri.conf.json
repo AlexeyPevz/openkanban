@@ -32,7 +32,7 @@
       "icons/icon.png"
     ],
     "resources": [
-      "../../../packages/sidecar/dist/sidecar-bundle.mjs"
+      "../../../packages/sidecar/dist/sidecar-bundle.cjs"
     ]
   }
 }

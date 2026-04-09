@@ -38,7 +38,7 @@ fn resolve_sidecar_path(app: &tauri::App) -> Result<String, Box<dyn std::error::
         Ok(sidecar_path.to_string_lossy().to_string())
     } else {
         let resource_dir = app.path().resource_dir()?;
-        let sidecar_path = resource_dir.join("sidecar-bundle.mjs");
+        let sidecar_path = resource_dir.join("sidecar-bundle.cjs");
         Ok(sidecar_path.to_string_lossy().to_string())
     }
 }
