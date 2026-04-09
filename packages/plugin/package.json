@@ -8,6 +8,9 @@
     ".": {
       "types": "./dist/plugin.d.ts",
       "default": "./dist/plugin.js"
+    },
+    "./bundle": {
+      "default": "./dist/openkanban.plugin.mjs"
     }
   },
   "files": ["dist"],

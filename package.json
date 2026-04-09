@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "npm run build:core && npm run build:plugin",
+    "bundle:plugin": "node scripts/bundle-plugin.mjs",
     "build:core": "npm run build -w @openkanban/core",
     "build:plugin": "npm run build -w @openkanban/plugin",
     "build:sidecar": "npm run build -w packages/sidecar",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "esbuild": "^0.28.0",
     "happy-dom": "^20.8.8",
     "typescript": "^6.0.2",
     "vitest": "^4.1.1"
