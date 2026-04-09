@@ -15,6 +15,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@openkanban/core": resolve(__dirname, "packages/core/src/index.ts"),
+      "@openkanban/core/resources/normalize": resolve(__dirname, "packages/core/src/resources/normalize.ts"),
+      "@openkanban/core/resources/types": resolve(__dirname, "packages/core/src/resources/types.ts"),
       '@openkanban/sidecar': resolve(__dirname, 'packages/sidecar/src/index.ts'),
       "@openkanban/plugin": resolve(__dirname, "packages/plugin/src/plugin.ts"),
     },

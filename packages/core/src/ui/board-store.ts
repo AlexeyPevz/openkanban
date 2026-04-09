@@ -1,12 +1,15 @@
 import type { TaskCard } from "../types.js"
 import type { Board } from "../repository/contracts.js"
-import type { ResourceAssignment } from "../resources/types.js"
-import { normalizeResources } from "../resources/normalize.js"
 import { BoardYamlRepository } from "../repository/canonical/board-yaml-repository.js"
 import {
   loadCanonicalTasksWithDiagnostics,
   type TaskRepositoryDiagnostic,
 } from "../repository/canonical/task-markdown-repository.js"
+
+// Re-export browser-safe helpers for backward compatibility.
+// New browser consumers should import from "@openkanban/core/browser" or
+// directly from "./task-helpers.js" to avoid pulling Node-only deps.
+export { getTasksForColumn, getTaskAgents, hasTaskBlocker, getTaskResources } from "./task-helpers.js"
 
 export interface BoardDiagnostic extends TaskRepositoryDiagnostic {}
 
@@ -27,30 +30,4 @@ export async function loadBoardWithDiagnostics(rootDir: string): Promise<Extract
     tasks,
     diagnostics,
   }
-}
-
-export function getTasksForColumn(tasks: TaskCard[], columnId: string): TaskCard[] {
-  return tasks.filter((task) => task.status === columnId)
-}
-
-export function getTaskAgents(task: TaskCard): string[] {
-  const requiredAgents = task.required_agents?.filter(Boolean) ?? []
-
-  if (requiredAgents.length > 0) {
-    return requiredAgents
-  }
-
-  return task.assignees?.filter(Boolean) ?? []
-}
-
-export function hasTaskBlocker(task: TaskCard): boolean {
-  return task.status === "blocked" || typeof task.blocked_reason === "string"
-}
-
-export function getTaskResources(task: TaskCard): ResourceAssignment[] {
-  return normalizeResources(
-    task.resources,
-    task.required_agents,
-    task.required_skills,
-  )
 }

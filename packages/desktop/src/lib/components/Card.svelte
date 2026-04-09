@@ -1,7 +1,7 @@
 <script lang="ts">
   import { draggable } from '../actions/draggable.js';
   import { selectTask } from '../stores/board.svelte.js';
-  import { getTaskResources } from '@openkanban/core';
+  import { getTaskResources } from '../task-resources.js';
   import type { TaskCard } from '@openkanban/core';
 
   interface Props {
