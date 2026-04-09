@@ -1,7 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
-import type { TaskRepository } from "@neon-tiger/core"
-import { createTask as coreCreateTask } from "@neon-tiger/core"
-import type { TaskStatus } from "@neon-tiger/core"
+import type { TaskRepository } from "@openkanban/core"
+import { createTask as coreCreateTask } from "@openkanban/core"
+import type { TaskStatus } from "@openkanban/core"
 
 export interface CreateTaskArgs {
   title: string

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadBoardWithDiagnostics } from "@neon-tiger/core"
+import { loadBoardWithDiagnostics } from "@openkanban/core"
 
 describe("repository partial parse failure resilience", () => {
   let rootDir: string

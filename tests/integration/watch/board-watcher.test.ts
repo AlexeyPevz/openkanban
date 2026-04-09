@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createBoardWatcher } from "@neon-tiger/core"
+import { createBoardWatcher } from "@openkanban/core"
 
 describe("watch/board-watcher", () => {
   let rootDir: string

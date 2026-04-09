@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { TaskEventSchema, createTaskEvent } from "@neon-tiger/core"
+import { TaskEventSchema, createTaskEvent } from "@openkanban/core"
 
 describe("core/task-event", () => {
   it("event payload matches expected shape", () => {

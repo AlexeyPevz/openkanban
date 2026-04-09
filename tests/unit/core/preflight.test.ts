@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { runPreflight } from "@neon-tiger/core"
+import { runPreflight } from "@openkanban/core"
 
 describe("core/preflight", () => {
   it("blocks planned to active when title missing", () => {

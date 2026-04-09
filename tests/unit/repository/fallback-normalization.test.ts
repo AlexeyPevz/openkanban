@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url"
 
 import { describe, expect, it } from "vitest"
 
-import { KanbanJsonRepository, MarkdownGlobRepository, TasksYmlRepository } from "@neon-tiger/core"
+import { KanbanJsonRepository, MarkdownGlobRepository, TasksYmlRepository } from "@openkanban/core"
 
 const fixturesRoot = resolve(fileURLToPath(new URL("../../fixtures", import.meta.url)))
 

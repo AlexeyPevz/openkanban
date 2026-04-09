@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ResourceRecord } from '@neon-tiger/core';
+import type { ResourceRecord } from '@openkanban/core';
 
 /**
  * Scan project directory for available resources:

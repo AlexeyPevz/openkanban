@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import matter from 'gray-matter';
-import { createBoardMethods, createTaskMethods } from '@neon-tiger/sidecar';
+import { createBoardMethods, createTaskMethods } from '@openkanban/sidecar';
 
 async function createTestWorkspace(): Promise<string> {
   const tmpDir = await mkdtemp(join(tmpdir(), 'sidecar-test-'));

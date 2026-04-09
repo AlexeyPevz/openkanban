@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
-import { loadBoardWithDiagnostics } from "@neon-tiger/core"
+import { loadBoardWithDiagnostics } from "@openkanban/core"
 
 export function loadBoardTool(directory: string) {
   return tool({

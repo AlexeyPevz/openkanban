@@ -1,5 +1,5 @@
 {
-  "name": "@neon-tiger/core",
+  "name": "@openkanban/core",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",

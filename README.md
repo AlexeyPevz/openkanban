@@ -1,4 +1,4 @@
-# neon-tiger
+# openkanban
 
 Kanban plugin for agentic IDEs. File-first task management for AI agents.
 
@@ -6,16 +6,16 @@ Kanban plugin for agentic IDEs. File-first task management for AI agents.
 
 | Package | Description |
 |---------|-------------|
-| `@neon-tiger/core` | Domain logic: types, schemas, transitions, repository, discovery, watch |
-| `@neon-tiger/plugin` | OpenCode plugin: tool registration, host adapter |
-| `@neon-tiger/sidecar` | JSON-RPC sidecar: board/task/resource methods, file watcher, stdio transport |
-| `@neon-tiger/desktop` | Tauri 2 + Svelte 5 desktop kanban board |
+| `@openkanban/core` | Domain logic: types, schemas, transitions, repository, discovery, watch |
+| `@openkanban/plugin` | OpenCode plugin: tool registration, host adapter |
+| `@openkanban/sidecar` | JSON-RPC sidecar: board/task/resource methods, file watcher, stdio transport |
+| `@openkanban/desktop` | Tauri 2 + Svelte 5 desktop kanban board |
 
 ## Quick Start
 
 ```bash
 # Install the OpenCode plugin
-opencode plugin install neon-tiger/neon-tiger
+opencode plugin install openkanban/openkanban
 
 # Tools available to agents:
 # kanban_load_board    — load board state

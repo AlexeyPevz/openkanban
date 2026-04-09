@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { createResourceRegistry, ResourceKindSchema } from '@neon-tiger/core';
-import type { ResourceRecord } from '@neon-tiger/core';
+import { createResourceRegistry, ResourceKindSchema } from '@openkanban/core';
+import type { ResourceRecord } from '@openkanban/core';
 import { discoverResources } from '../discovery/discover-resources.js';
 import type { MethodRegistry } from './index.js';
 

@@ -2,7 +2,7 @@
   import Card from './Card.svelte';
   import { droptarget } from '../actions/droptarget.js';
   import { moveTask } from '../stores/board.svelte.js';
-  import type { TaskCard } from '@neon-tiger/core';
+  import type { TaskCard } from '@openkanban/core';
 
   interface Props {
     status: string;

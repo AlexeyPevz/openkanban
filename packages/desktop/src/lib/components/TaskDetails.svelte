@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getSelectedTask, selectTask } from '../stores/board.svelte.js';
-  import { getTaskResources } from '@neon-tiger/core';
+  import { getTaskResources } from '@openkanban/core';
 
   let task = $derived(getSelectedTask());
   let resources = $derived(task ? getTaskResources(task) : []);

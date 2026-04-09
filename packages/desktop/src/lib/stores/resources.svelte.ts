@@ -1,5 +1,5 @@
 import { resourceApi } from '../rpc.js';
-import type { ResourceRecord, ResourceKind } from '@neon-tiger/core';
+import type { ResourceRecord, ResourceKind } from '@openkanban/core';
 
 let resources = $state<ResourceRecord[]>([]);
 let loading = $state(false);

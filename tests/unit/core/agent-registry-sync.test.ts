@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { mergeAgentSources, resolveAgentRegistry, BoardYamlRepository } from "@neon-tiger/core"
+import { mergeAgentSources, resolveAgentRegistry, BoardYamlRepository } from "@openkanban/core"
 
 // saveAdHocAgent is not exported from barrel — import directly
 import { saveAdHocAgent } from "../../../packages/core/src/agents/resolve-agent-registry"

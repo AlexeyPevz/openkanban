@@ -1,5 +1,5 @@
 import { boardApi, taskApi, type BoardViewState } from '../rpc.js';
-import type { TaskCard, CreateTaskInput, TaskPatch } from '@neon-tiger/core';
+import type { TaskCard, CreateTaskInput, TaskPatch } from '@openkanban/core';
 
 let boardState = $state<BoardViewState>({ state: 'loading' });
 let selectedTaskId = $state<string | null>(null);

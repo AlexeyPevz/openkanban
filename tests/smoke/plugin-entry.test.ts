@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { plugin } from "@neon-tiger/plugin"
+import { plugin } from "@openkanban/plugin"
 
 describe("plugin entry", () => {
   it("returns a hooks object", async () => {

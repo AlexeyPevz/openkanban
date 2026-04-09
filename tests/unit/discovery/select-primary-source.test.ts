@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import type { SourceCandidate } from "@neon-tiger/core"
-import { selectPrimarySource } from "@neon-tiger/core"
+import type { SourceCandidate } from "@openkanban/core"
+import { selectPrimarySource } from "@openkanban/core"
 
 function createCandidate(input: Partial<SourceCandidate> & Pick<SourceCandidate, "kind" | "path" | "priority">): SourceCandidate {
   return {

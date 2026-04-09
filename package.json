@@ -1,5 +1,5 @@
 {
-  "name": "neon-tiger",
+  "name": "openkanban",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,8 +11,8 @@
   ],
   "scripts": {
     "build": "npm run build:core && npm run build:plugin",
-    "build:core": "npm run build -w @neon-tiger/core",
-    "build:plugin": "npm run build -w @neon-tiger/plugin",
+    "build:core": "npm run build -w @openkanban/core",
+    "build:plugin": "npm run build -w @openkanban/plugin",
     "build:sidecar": "npm run build -w packages/sidecar",
     "build:sidecar-bundle": "npx esbuild packages/sidecar/dist/index.js --bundle --platform=node --format=esm --outfile=packages/sidecar/dist/sidecar-bundle.mjs",
     "build:desktop": "npm run build -w packages/desktop",

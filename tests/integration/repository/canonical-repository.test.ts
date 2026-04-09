@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { BoardYamlRepository, TaskMarkdownRepository, createTask, updateTask, updateTaskStatus } from "@neon-tiger/core"
+import { BoardYamlRepository, TaskMarkdownRepository, createTask, updateTask, updateTaskStatus } from "@openkanban/core"
 
 async function createCanonicalWorkspace(rootDir: string) {
   const tasksDir = join(rootDir, ".tasks", "tasks")

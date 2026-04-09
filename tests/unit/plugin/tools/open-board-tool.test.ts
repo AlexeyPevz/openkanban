@@ -19,14 +19,14 @@ describe("kanban_open_board handler", () => {
     const deps: OpenBoardDeps = {
       directory: "/project",
       isLockActive: vi.fn().mockResolvedValue(false),
-      resolveBinary: vi.fn().mockResolvedValue("/usr/bin/neon-tiger-desktop"),
+      resolveBinary: vi.fn().mockResolvedValue("/usr/bin/openkanban-desktop"),
       spawnDetached: vi.fn(),
     }
     const handler = makeOpenBoardHandler(deps)
     const result = await handler()
     expect(result).toContain("opened")
     expect(deps.spawnDetached).toHaveBeenCalledWith(
-      "/usr/bin/neon-tiger-desktop",
+      "/usr/bin/openkanban-desktop",
       ["--directory", "/project"],
     )
   })

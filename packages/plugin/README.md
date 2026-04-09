@@ -1,11 +1,11 @@
-# @neon-tiger/plugin
+# @openkanban/plugin
 
 OpenCode plugin for kanban task management. Provides tools for AI agents to create, read, update, and manage tasks.
 
 ## Installation
 
 ```bash
-opencode plugin install neon-tiger/neon-tiger
+opencode plugin install openkanban/openkanban
 ```
 
 ## Tools

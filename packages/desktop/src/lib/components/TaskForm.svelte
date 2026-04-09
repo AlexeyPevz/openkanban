@@ -6,7 +6,7 @@
   } from '../stores/board.svelte.js';
   import { getResources } from '../stores/resources.svelte.js';
   import { onMount } from 'svelte';
-  import type { ResourceAssignment } from '@neon-tiger/core';
+  import type { ResourceAssignment } from '@openkanban/core';
 
   interface Props {
     taskId: string | null;

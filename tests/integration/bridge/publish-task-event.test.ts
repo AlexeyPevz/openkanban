@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { publishTaskEvent, type TaskEvent } from "@neon-tiger/core"
+import { publishTaskEvent, type TaskEvent } from "@openkanban/core"
 
 const event: TaskEvent = {
   event_id: "evt-001",

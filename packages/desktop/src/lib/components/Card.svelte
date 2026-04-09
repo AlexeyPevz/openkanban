@@ -1,8 +1,8 @@
 <script lang="ts">
   import { draggable } from '../actions/draggable.js';
   import { selectTask } from '../stores/board.svelte.js';
-  import { getTaskResources } from '@neon-tiger/core';
-  import type { TaskCard } from '@neon-tiger/core';
+  import { getTaskResources } from '@openkanban/core';
+  import type { TaskCard } from '@openkanban/core';
 
   interface Props {
     task: TaskCard;

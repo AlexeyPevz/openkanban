@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
-import type { TaskRepository, TaskStatus, TaskCard } from "@neon-tiger/core"
+import type { TaskRepository, TaskStatus, TaskCard } from "@openkanban/core"
 
 export interface ListTasksFilter {
   status?: TaskStatus

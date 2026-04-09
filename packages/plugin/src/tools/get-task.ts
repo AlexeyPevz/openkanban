@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
-import type { TaskRepository } from "@neon-tiger/core"
+import type { TaskRepository } from "@openkanban/core"
 
 export function makeGetTaskHandler(taskRepository: TaskRepository) {
   return async (args: { taskId: string }): Promise<string> => {

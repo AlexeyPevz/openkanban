@@ -1,11 +1,11 @@
 import { tool } from "@opencode-ai/plugin"
-import type { TaskRepository, TaskStatus, RuntimePublisher } from "@neon-tiger/core"
+import type { TaskRepository, TaskStatus, RuntimePublisher } from "@openkanban/core"
 import {
   loadBoardWithDiagnostics,
   createTaskEvent,
   publishTaskEvent,
   updateTaskStatus,
-} from "@neon-tiger/core"
+} from "@openkanban/core"
 
 export interface MoveTaskDeps {
   directory: string

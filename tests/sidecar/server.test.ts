@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRpcDispatcher } from '@neon-tiger/sidecar';
+import { createRpcDispatcher } from '@openkanban/sidecar';
 
 describe('JSON-RPC dispatcher', () => {
   it('dispatches to registered method', async () => {

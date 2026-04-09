@@ -16,7 +16,7 @@ import {
   createTaskEvent,
   publishTaskEvent,
   type RuntimePublisher,
-} from "@neon-tiger/core"
+} from "@openkanban/core"
 
 import { makeCreateTaskHandler } from "../../packages/plugin/src/tools/create-task.js"
 import { makeGetTaskHandler } from "../../packages/plugin/src/tools/get-task.js"

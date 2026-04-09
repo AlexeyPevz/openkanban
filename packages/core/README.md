@@ -1,6 +1,6 @@
-# @neon-tiger/core
+# @openkanban/core
 
-Shared domain logic for neon-tiger kanban system.
+Shared domain logic for openkanban kanban system.
 
 ## Contents
 
@@ -23,5 +23,5 @@ import {
   runPreflight,
   BoardYamlRepository,
   TaskMarkdownRepository,
-} from "@neon-tiger/core"
+} from "@openkanban/core"
 ```

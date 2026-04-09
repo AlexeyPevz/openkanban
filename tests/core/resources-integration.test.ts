@@ -5,7 +5,7 @@ import {
   normalizeResources,
   type TaskCard,
   type ResourceAssignment,
-} from '@neon-tiger/core';
+} from '@openkanban/core';
 
 describe('TaskCard with resources', () => {
   it('parses TaskCard with resources field', () => {

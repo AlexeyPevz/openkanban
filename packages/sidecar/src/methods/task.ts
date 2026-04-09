@@ -6,7 +6,7 @@ import {
   updateTaskStatus,
   canTransition,
   TaskStatusSchema,
-} from '@neon-tiger/core';
+} from '@openkanban/core';
 import type { MethodRegistry } from './index.js';
 
 // --- Zod param schemas ---

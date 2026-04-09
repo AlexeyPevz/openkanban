@@ -3,7 +3,7 @@ import {
   BoardYamlRepository,
   TaskMarkdownRepository,
   type RuntimePublisher,
-} from "@neon-tiger/core"
+} from "@openkanban/core"
 
 import { createOpenCodeAdapter } from "./host/adapter.js"
 import { probeCapabilities } from "./host/probe-capabilities.js"

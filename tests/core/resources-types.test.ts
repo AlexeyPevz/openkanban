@@ -3,7 +3,7 @@ import {
   ResourceKindSchema,
   ResourceRecordSchema,
   ResourceAssignmentSchema,
-} from '@neon-tiger/core';
+} from '@openkanban/core';
 
 describe('ResourceKindSchema', () => {
   it('accepts valid kinds', () => {

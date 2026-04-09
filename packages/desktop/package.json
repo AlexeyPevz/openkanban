@@ -1,5 +1,5 @@
 {
-  "name": "@neon-tiger/desktop",
+  "name": "@openkanban/desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",

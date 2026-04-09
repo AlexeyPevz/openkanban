@@ -4,7 +4,7 @@ import type {
   CreateTaskInput,
   TaskPatch,
   ResourceRecord,
-} from '@neon-tiger/core';
+} from '@openkanban/core';
 
 export interface RpcError {
   code: number;
