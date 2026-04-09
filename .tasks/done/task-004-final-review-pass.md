@@ -41,3 +41,19 @@
 
 ## Next step
 - По запросу пользователя: либо оформить git commit, либо подготовить PR-ready summary, либо провести отдельный live-host smoke/integration pass для OpenCode runtime
+
+## Post-merge closure
+- PR `#1` (`opencode/neon-tiger` -> `main`) смёржен: `https://github.com/AlexeyPevz/openkanban/pull/1`
+- Merge commit в `main`: `7a15f3045156cb46f32834afcdcf39cd32ff7acd`
+- Review-fix commit на feature branch перед merge: `3dcc3a8`
+- Локальный `main` синхронизирован с `origin/main`
+- Локальная ветка `opencode/neon-tiger` удалена
+- Связанный worktree `neon-tiger` снят из `git worktree list`; дальнейшая работа идёт из `happy-wizard` на ветке `main`
+
+## Post-merge verification
+- `gh pr view 1 --json number,state,mergedAt,mergeCommit,url,title` — подтвердил `state: MERGED`
+- `git branch -d opencode/neon-tiger` — локальная merged-ветка удалена
+- `git status --short --branch` в `happy-wizard` — дерево чистое до обновления этого task-файла
+
+## Residual note
+- Во время cleanup в Windows-worktree появлялся untracked артефакт `NUL/nul`; он был удалён из активного worktree командой `rm -f -- ./nul`
