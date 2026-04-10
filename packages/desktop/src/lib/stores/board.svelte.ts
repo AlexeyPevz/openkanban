@@ -27,6 +27,20 @@ export async function loadBoard(): Promise<void> {
   }
 }
 
+/** Silent refresh — fetches new data without flashing loading state.
+ *  If board is not in success state, falls back to loadBoard (shows loading).
+ *  On API failure while in success state, keeps current data silently. */
+export async function refreshBoard(): Promise<void> {
+  if (boardState.state !== 'success') {
+    return loadBoard();
+  }
+  const result = await boardApi.load();
+  if (result.ok) {
+    boardState = result.data;
+  }
+  // On failure: silently keep current data (no error flash)
+}
+
 export async function moveTask(id: string, status: string): Promise<boolean> {
   const result = await taskApi.move(id, status);
   if (result.ok) {
@@ -70,7 +84,7 @@ export function getTasksByStatus(status: string): TaskCard[] {
 /** Subscribe to sidecar:board.changed Tauri event. Returns unlisten cleanup function. */
 export async function subscribeBoardChanged(): Promise<() => void> {
   const unlisten = await listen('sidecar:board.changed', () => {
-    loadBoard();
+    refreshBoard();
   });
   return unlisten;
 }
@@ -83,25 +97,25 @@ export async function subscribeTaskChanged(): Promise<() => void> {
       const { taskId, changeType } = event.payload;
 
       if (changeType === 'added' || changeType === 'removed') {
-        loadBoard();
+        refreshBoard();
         return;
       }
 
       // changeType === 'changed' → attempt partial refresh
       if (boardState.state !== 'success') {
-        loadBoard();
+        refreshBoard();
         return;
       }
 
       const result = await taskApi.get(taskId);
       if (!result.ok) {
-        loadBoard();
+        refreshBoard();
         return;
       }
 
       const idx = boardState.tasks.findIndex((t) => t.id === taskId);
       if (idx === -1) {
-        loadBoard();
+        refreshBoard();
         return;
       }
 

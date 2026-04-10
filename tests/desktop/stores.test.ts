@@ -19,6 +19,7 @@ import { listen } from '@tauri-apps/api/event';
 // Board store tests
 import {
   loadBoard,
+  refreshBoard,
   moveTask,
   createTask,
   getBoardState,
@@ -202,6 +203,127 @@ describe('board store', () => {
   });
 });
 
+describe('refreshBoard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('silently updates board data without setting loading state', async () => {
+    // Put board in success state first
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'Old', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' }],
+        statuses: ['planned', 'done'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+    expect(getBoardState().state).toBe('success');
+
+    // Setup refresh response with new data
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [
+          { id: 't1', title: 'Updated', status: 'done', source_file: 'a.md', updated_at: '2024-01-02' },
+          { id: 't2', title: 'New Task', status: 'planned', source_file: 'b.md', updated_at: '2024-01-02' },
+        ],
+        statuses: ['planned', 'done'],
+        diagnostics: [],
+      },
+    });
+
+    // Track state changes during refresh
+    const statesDuringRefresh: string[] = [];
+    const originalState = getBoardState();
+
+    // We use a trick: poll the state to ensure it never goes to 'loading'
+    const interval = setInterval(() => {
+      statesDuringRefresh.push(getBoardState().state);
+    }, 0);
+
+    await refreshBoard();
+
+    clearInterval(interval);
+
+    // State should NEVER have been 'loading' during refresh
+    expect(statesDuringRefresh.every((s) => s !== 'loading')).toBe(true);
+
+    // Verify data was updated
+    const state = getBoardState();
+    expect(state.state).toBe('success');
+    if (state.state === 'success') {
+      expect(state.tasks).toHaveLength(2);
+      expect(state.tasks[0].title).toBe('Updated');
+      expect(state.tasks[1].title).toBe('New Task');
+    }
+  });
+
+  it('keeps current data on API failure', async () => {
+    // Put board in success state with tasks
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'Keep Me', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' }],
+        statuses: ['planned'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+    expect(getBoardState().state).toBe('success');
+
+    // Setup failing refresh
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: false,
+      error: { code: -1, message: 'network error' },
+    });
+
+    await refreshBoard();
+
+    // Board should still have original data
+    const state = getBoardState();
+    expect(state.state).toBe('success');
+    if (state.state === 'success') {
+      expect(state.tasks).toHaveLength(1);
+      expect(state.tasks[0].title).toBe('Keep Me');
+    }
+  });
+
+  it('works from error state (falls back to loadBoard with loading)', async () => {
+    // Put board into error state
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: false,
+      error: { code: -1, message: 'fail' },
+    });
+    await loadBoard();
+    expect(getBoardState().state).toBe('error');
+
+    // Setup successful refresh — should go through loading since there's no data to show
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'Recovered', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' }],
+        statuses: ['planned'],
+        diagnostics: [],
+      },
+    });
+
+    await refreshBoard();
+
+    // Should transition to success
+    const state = getBoardState();
+    expect(state.state).toBe('success');
+    if (state.state === 'success') {
+      expect(state.tasks[0].title).toBe('Recovered');
+    }
+  });
+});
+
 describe('subscribeBoardChanged', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -221,17 +343,26 @@ describe('subscribeBoardChanged', () => {
     expect(mockListen).toHaveBeenCalledWith('sidecar:board.changed', expect.any(Function));
   });
 
-  it('calls loadBoard when sidecar:board.changed event fires', async () => {
+  it('silently refreshes board when sidecar:board.changed event fires (no loading flash)', async () => {
+    // First put board in success state
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'Original', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' }],
+        statuses: ['planned'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+    expect(getBoardState().state).toBe('success');
+
     const mockUnlisten = vi.fn();
     let capturedHandler: ((event: any) => void) | undefined;
 
     mockListen.mockImplementationOnce(async (_eventName: any, handler: any) => {
       capturedHandler = handler;
       return mockUnlisten;
-    });
-    mockBoardApi.load.mockResolvedValue({
-      ok: true,
-      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
     });
 
     await subscribeBoardChanged();
@@ -240,16 +371,32 @@ describe('subscribeBoardChanged', () => {
     mockBoardApi.load.mockClear();
     mockBoardApi.load.mockResolvedValue({
       ok: true,
-      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'Refreshed', status: 'done', source_file: 'a.md', updated_at: '2024-01-02' }],
+        statuses: ['planned', 'done'],
+        diagnostics: [],
+      },
     });
+
+    // Track state changes
+    const statesDuringRefresh: string[] = [];
+    const interval = setInterval(() => {
+      statesDuringRefresh.push(getBoardState().state);
+    }, 0);
 
     // Simulate the Tauri event firing
     capturedHandler!({ event: 'sidecar:board.changed', id: 1, payload: {} });
 
-    // loadBoard is async but the handler calls it — give it a tick
+    // Wait for async handler to complete
     await vi.waitFor(() => {
       expect(mockBoardApi.load).toHaveBeenCalledTimes(1);
     });
+
+    clearInterval(interval);
+
+    // Board should NOT have gone through 'loading' state (silent refresh)
+    expect(statesDuringRefresh.every((s) => s !== 'loading')).toBe(true);
   });
 
   it('returns an unlisten function for cleanup', async () => {
@@ -349,7 +496,20 @@ describe('subscribeTaskChanged', () => {
     }
   });
 
-  it('changeType "added" calls loadBoard', async () => {
+  it('changeType "added" silently refreshes (no loading flash)', async () => {
+    // First put board in success state
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'Existing', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' }],
+        statuses: ['planned'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+    expect(getBoardState().state).toBe('success');
+
     const mockUnlisten = vi.fn();
     let capturedHandler: ((event: any) => void) | undefined;
 
@@ -363,17 +523,49 @@ describe('subscribeTaskChanged', () => {
     mockBoardApi.load.mockClear();
     mockBoardApi.load.mockResolvedValueOnce({
       ok: true,
-      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+      data: {
+        state: 'success' as const,
+        tasks: [
+          { id: 't1', title: 'Existing', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' },
+          { id: 't2', title: 'Added', status: 'planned', source_file: 'b.md', updated_at: '2024-01-02' },
+        ],
+        statuses: ['planned'],
+        diagnostics: [],
+      },
     });
 
-    capturedHandler!({ event: 'sidecar:task.changed', id: 1, payload: { taskId: 't1', changeType: 'added' } });
+    // Track state changes
+    const statesDuringRefresh: string[] = [];
+    const interval = setInterval(() => {
+      statesDuringRefresh.push(getBoardState().state);
+    }, 0);
+
+    capturedHandler!({ event: 'sidecar:task.changed', id: 1, payload: { taskId: 't2', changeType: 'added' } });
 
     await vi.waitFor(() => {
       expect(mockBoardApi.load).toHaveBeenCalledTimes(1);
     });
+
+    clearInterval(interval);
+
+    // Should NOT flash to loading
+    expect(statesDuringRefresh.every((s) => s !== 'loading')).toBe(true);
   });
 
-  it('changeType "removed" calls loadBoard', async () => {
+  it('changeType "removed" silently refreshes (no loading flash)', async () => {
+    // First put board in success state
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'ToRemove', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' }],
+        statuses: ['planned'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+    expect(getBoardState().state).toBe('success');
+
     const mockUnlisten = vi.fn();
     let capturedHandler: ((event: any) => void) | undefined;
 
@@ -387,14 +579,25 @@ describe('subscribeTaskChanged', () => {
     mockBoardApi.load.mockClear();
     mockBoardApi.load.mockResolvedValueOnce({
       ok: true,
-      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+      data: { state: 'success' as const, tasks: [], statuses: ['planned'], diagnostics: [] },
     });
+
+    // Track state changes
+    const statesDuringRefresh: string[] = [];
+    const interval = setInterval(() => {
+      statesDuringRefresh.push(getBoardState().state);
+    }, 0);
 
     capturedHandler!({ event: 'sidecar:task.changed', id: 1, payload: { taskId: 't1', changeType: 'removed' } });
 
     await vi.waitFor(() => {
       expect(mockBoardApi.load).toHaveBeenCalledTimes(1);
     });
+
+    clearInterval(interval);
+
+    // Should NOT flash to loading
+    expect(statesDuringRefresh.every((s) => s !== 'loading')).toBe(true);
   });
 
   it('falls back to loadBoard when board not in success state', async () => {
