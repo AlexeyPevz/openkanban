@@ -2,6 +2,7 @@
   import Board from './lib/components/Board.svelte';
   import ShortcutsHelp from './lib/components/ShortcutsHelp.svelte';
   import { loadPreset, getThemeName, toggleTheme } from './lib/stores/theme.svelte.js';
+  import { subscribeBoardChanged, subscribeTaskChanged } from './lib/stores/board.svelte.js';
   import { shortcuts } from './lib/actions/shortcuts.js';
   import { onMount } from 'svelte';
 
@@ -9,6 +10,16 @@
 
   onMount(() => {
     loadPreset('opencode');
+
+    // Subscribe to live sync events from sidecar
+    const boardUnlistenPromise = subscribeBoardChanged();
+    const taskUnlistenPromise = subscribeTaskChanged();
+
+    return () => {
+      // Cleanup: unlisten on unmount
+      boardUnlistenPromise.then((unlisten) => unlisten());
+      taskUnlistenPromise.then((unlisten) => unlisten());
+    };
   });
 
   const globalKeymap = {

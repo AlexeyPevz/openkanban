@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createResourceRegistry, ResourceKindSchema } from '@openkanban/core';
+import { createResourceRegistry, ResourceKindSchema, TaskMarkdownRepository, updateTask } from '@openkanban/core';
 import type { ResourceRecord } from '@openkanban/core';
 import { discoverResources } from '../discovery/discover-resources.js';
 import type { MethodRegistry } from './index.js';
@@ -11,6 +11,7 @@ const ResourcesListParamsSchema = z.object({
 }).strict();
 
 const ResourcesAssignParamsSchema = z.object({
+  taskId: z.string().min(1),
   kind: ResourceKindSchema,
   name: z.string().min(1),
 }).strict();
@@ -27,6 +28,7 @@ function validate<T>(schema: z.ZodType<T>, params: unknown, method: string): T {
 
 export function createResourceMethods(projectDir: string): MethodRegistry {
   let records: ResourceRecord[] = [];
+  const repo = new TaskMarkdownRepository(projectDir);
 
   return {
     'resources.discover': async () => {
@@ -45,23 +47,49 @@ export function createResourceMethods(projectDir: string): MethodRegistry {
     },
 
     'resources.assign': async (params) => {
-      const { kind, name } = validate(ResourcesAssignParamsSchema, params, 'resources.assign');
+      const { taskId, kind, name } = validate(ResourcesAssignParamsSchema, params, 'resources.assign');
+
+      const task = await repo.loadTaskById(taskId);
+      if (!task) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+
+      const nextResources = [...(task.resources ?? [])];
+      const existingResource = nextResources.find((resource) => resource.kind === kind && resource.name === name);
+
+      if (existingResource) {
+        existingResource.required = true;
+      } else {
+        nextResources.push({ kind, name, required: true });
+      }
+
+      await updateTask(repo, taskId, { resources: nextResources });
+
       const existing = records.find((r) => r.kind === kind && r.name === name);
       if (existing) {
         existing.available = true;
       } else {
         records.push({ kind, name, available: true });
       }
-      return { ok: true, kind, name };
+      return { ok: true, taskId, kind, name };
     },
 
     'resources.unassign': async (params) => {
-      const { kind, name } = validate(ResourcesAssignParamsSchema, params, 'resources.unassign');
+      const { taskId, kind, name } = validate(ResourcesAssignParamsSchema, params, 'resources.unassign');
+
+      const task = await repo.loadTaskById(taskId);
+      if (!task) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+
+      const nextResources = (task.resources ?? []).filter((resource) => !(resource.kind === kind && resource.name === name));
+      await updateTask(repo, taskId, { resources: nextResources });
+
       const existing = records.find((r) => r.kind === kind && r.name === name);
       if (existing) {
         existing.available = false;
       }
-      return { ok: true, kind, name };
+      return { ok: true, taskId, kind, name };
     },
   };
 }

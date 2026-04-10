@@ -1,308 +1,261 @@
-# Technical Design — Kanban Plugin for Agentic IDEs MVP
+# Technical Design — OpenKanban Companion for OpenCode MVP
 
 ## 1. Verified repo facts
 
-По состоянию репозитория на момент подготовки design:
+По текущему состоянию репозитория подтверждено:
 
-- проект пока не содержит production source code;
-- в `.opencode/package.json` подключён `@opencode-ai/plugin@1.3.0`;
-- в проверенном `@opencode-ai/plugin` подтверждены plugin hooks, tool definitions и shell access;
-- в проверенном package не найдено явного публичного API для отдельной host UI injection surface.
+- OpenCode plugin surface доступен через `@opencode-ai/plugin` hooks/tools/shell;
+- native host UI injection surface не подтверждён как production-capable путь;
+- companion desktop app на Tauri уже существует и запускается отдельно от host UI;
+- plugin уже умеет открыть desktop binary через tool flow `kanban_open_board`;
+- backend разделён на file-first core + JSON-RPC sidecar + desktop UI;
+- часть MVP реализована, но есть product drift между docs и реальным кодом.
 
-Следствие: core и contracts можно проектировать уверенно, а host capability surface нужно валидировать ранним spike/task.
+Следствие: целевой продукт — не host-native panel, а **OpenCode-aware companion app**.
 
 ## 2. Architectural stance
 
 ### Рекомендуемый подход
 
-`file-first host-adapted kanban`
+`file-first host-aware companion kanban`
 
-Система делится на независимые bounded components:
+Система делится на bounded components:
 
 1. **Core domain** — canonical task model, status rules, preflight, normalization
-2. **Discovery service** — поиск и выбор source-of-truth
+2. **Discovery service** — поиск task sources и project-scoped context
 3. **Repository adapters** — чтение/запись конкретных форматов
 4. **Watcher layer** — реакция на file changes
 5. **Orchestrator bridge** — публикация task lifecycle events
-6. **Host adapter** — commands, hotkeys, theme, fonts, runtime glue
-7. **UI renderer** — board, columns, cards, details, errors, empty/loading states
+6. **OpenCode adapter** — launch contract, active project binding, project catalog, theme/font hints, command/hotkey surface
+7. **Sidecar runtime** — JSON-RPC bridge между desktop UI и file-first core
+8. **Companion UI** — board, project switcher, task flows, diagnostics, details, empty/error states
 
-Такая схема сохраняет переносимость: OpenCode-specific часть живёт в adapter/bridge, а не в domain/core.
+Ключевой принцип: OpenCode задаёт default context, а companion app выступает отдельным operational center.
 
-## 3. Recommended canonical task format
+## 3. Product contract
 
-### Board file
+### Default flow
 
-` .tasks/board.yml ` — каноническое описание board columns, source selection, agent registry references, default gates.
+1. Пользователь работает в OpenCode.
+2. Active project OpenCode считается default project context.
+3. Команда/tool/hotkey OpenCode открывает companion app.
+4. Companion app показывает board active project.
 
-### Task files
+### Extended flow
 
-` .tasks/tasks/*.md ` — human-readable task records с YAML frontmatter или другой структурированной шапкой.
+Companion app может:
 
-Почему так:
-
-- git-friendly diff;
-- удобно читать человеку и агенту;
-- можно сохранять rich context прямо рядом с task;
-- легко мигрировать из других форматов через adapters.
+- показать список известных OpenCode проектов;
+- вручную переключиться на другой проект;
+- оставаться полноценно редактируемым и file-first даже для проекта, который не активен в OpenCode в данный момент.
 
 ## 4. Data flow
 
 ### Read path
 
-1. Discovery service сканирует project root
-2. Source selector выбирает primary source
-3. Repository adapter парсит данные
-4. Normalizer строит canonical board model
-5. UI renderer отображает model
+1. OpenCode adapter определяет default active project и список известных проектов.
+2. Companion app выбирает current project context.
+3. Sidecar стартует/перепривязывается к project root.
+4. Discovery service находит primary task source.
+5. Repository adapter парсит данные.
+6. Normalizer строит canonical board model.
+7. UI отображает board + source diagnostics + project context.
 
 ### Write path
 
-1. Пользователь выполняет drag-and-drop или command action
-2. Status transition service валидирует переход
-3. Preflight engine проверяет gates для `-> active`
-4. Repository adapter пишет обновление в source-of-truth
-5. Orchestrator bridge публикует event
-6. Watcher/UI получают подтверждающее обновление
+1. Пользователь выполняет board action (move/create/edit/assign resource).
+2. Desktop UI вызывает sidecar method.
+3. Domain/service слой валидирует действие.
+4. Repository adapter пишет изменение в source-of-truth.
+5. Sidecar публикует runtime notification.
+6. Frontend подписан на notification и актуализирует board state.
 
-## 5. Transition and gate model
+### Runtime event contract for live sync
 
-### Базовые переходы
+Подтверждённый текущий transport chain:
 
-- `planned -> active`
-- `active -> review`
-- `active -> blocked`
-- `blocked -> active`
-- `review -> done`
-- `planned -> cancelled`
-- `planned -> parked`
+1. `FileWatcher` в sidecar следит за `projectDir/.tasks`.
+2. Для task markdown changes sidecar публикует JSON-RPC notification `task.changed` с payload `{ taskId, changeType }`.
+3. Для любого изменения под `.tasks/` sidecar публикует JSON-RPC notification `board.changed` с payload `{}`.
+4. Rust bridge в Tauri проксирует каждую notification в webview event `sidecar:<method>`.
+5. Следовательно, frontend boundary уже может слушать:
+   - `sidecar:task.changed` → payload `{ taskId, changeType }`
+   - `sidecar:board.changed` → payload `{}`
 
-### Правило preflight
+Target MVP refresh contract:
 
-Только переход в `active` обязан проходить preflight.
+- `sidecar:board.changed` всегда делает полный `loadBoard()`.
+- `sidecar:task.changed` обрабатывается по `changeType`:
+  - `changed` → `taskApi.get(taskId)` + точечный merge в `boardState`
+  - `added` / `removed` → полный `loadBoard()`
+- Если partial refresh не может быть безопасно завершён, frontend делает fallback на полный `loadBoard()`.
 
-Проверки MVP:
+Этот target contract документирован до реализации; по текущему коду frontend listener-ы ещё отсутствуют.
 
-- есть `title`
-- есть source file
-- нет fatal parse/validation error
-- выполнены required field checks
-- выполнены preset/custom gates, если они заданы
+## 5. Core functional gaps identified by audit
 
-Если preflight падает:
+### G1. Task payload boundary mismatch
 
-- запись в `blocked_reason`
-- transition result = `blocked`
-- orchestration start не выполняется
+Desktop UI уже отправляет richer task payload, но sidecar task schemas поддерживают только урезанный subset. Это нужно исправить первым.
 
-## 6. Boundary contracts
+### G2. Resource workflow incomplete
 
-### Domain boundary
+- discovery есть частично;
+- persisted assign/unassign отсутствует;
+- drag/drop ресурсов отсутствует;
+- `tool` resources не discoverятся.
 
-Domain не знает ничего о конкретном UI, хосте или файловом формате.
+### G3. Live sync chain incomplete
 
-### Repository boundary
+Watcher + sidecar notification + Rust bridge есть, и transport contract уже подтверждён: `task.changed` → `sidecar:task.changed`, `board.changed` → `sidecar:board.changed`. Но desktop frontend пока не подписан на эти события и не реализует target refresh behavior.
 
-Каждый adapter реализует единый контракт:
+### G4. OpenCode companion integration incomplete
 
-- `discover()`
-- `loadBoard()`
-- `loadTasks()`
-- `writeTaskStatus()`
-- `writeTaskMetadata()`
+- есть tool-triggered open board flow;
+- нет завершённого current-project binding contract;
+- нет project catalog / manual switcher;
+- нет full-edit flow для manually selected project.
 
-Все входы и выходы валидируются schema-first.
+### G5. Host-native UX incomplete
 
-### Host boundary
+- theme/font context не приходит из host;
+- используются локальные preset-ы и локальные стили.
 
-Host adapter предоставляет:
+## 6. OpenCode integration model
 
-- command registration
-- hotkey integration
-- theme/font lookup
-- optional panel/overlay mounting
-- event publishing into host runtime
+### Confirmed today
 
-## 7. OpenCode host strategy
+- plugin install flow есть;
+- tool-triggered board open flow есть;
+- desktop binary launch с `--directory` уже заявлен на plugin layer.
 
-### Целевой UX
+### Must be completed
 
-Иконка в host chrome + hotkey + верхняя выезжающая resizable overlay/panel.
+1. Зафиксировать launch contract между plugin и companion app.
+2. Сделать current-project default binding детерминированным.
+3. Добавить project catalog и manual project switching.
+4. Определить lifecycle sidecar per project: respawn vs multiplexing.
 
-### Реально подтверждённое сегодня
+### Recommended MVP approach
 
-Через проверенный plugin package подтверждён только hook/tool/shell surface.
+- один active project context в companion app одновременно;
+- ручное переключение проекта = controlled rebind current context;
+- sidecar можно перезапускать на новый project root при переключении, вместо раннего multi-tenant runtime.
 
-### Capability matrix для OpenCode
+Это проще, безопаснее и достаточно для MVP.
 
-Ранний validation slice обязан проверить пять capability classes:
+## 7. Theming and fonts
 
-1. panel/overlay mounting
-2. command registration
-3. hotkeys integration
-4. theme/font lookup
-5. runtime event publishing
+### MVP target
 
-Для каждой capability фиксируются:
+- host-derived theme/font context, если OpenCode surface это позволяет;
+- fallback preset-ы остаются только degraded path, а не primary design source.
 
-- status: `verified` / `unverified` / `unsupported`
-- способ интеграции
-- ограничения
-- fallback path
+### Practical strategy
 
-Exit criteria slice:
+1. Plugin/host adapter поставляет runtime context (`theme`, `fontFamily`, future tokens if available).
+2. Companion app применяет host tokens к CSS custom properties.
+3. Если host context не подтверждён, включается явно помеченный fallback preset.
 
-- подтверждён хотя бы один реальный UI surface для board;
-- подтверждён хотя бы один способ открыть board командой;
-- подтверждён путь keyboard interaction или documented fallback;
-- подтверждён или отклонён runtime event path.
+## 8. Resource model and UX
 
-### Поэтому MVP strategy
+### MVP contract
 
-1. **Validation slice:** подтвердить, существует ли поддерживаемый путь для host-native panel/overlay.
-2. **Если путь подтверждён:** делаем host-native panel как основной UI surface.
-3. **Если путь не подтверждён:** оставляем тот же core, а UI открываем через command-driven panel/webview bridge или ближайший поддерживаемый host surface.
+Resources включают как минимум:
 
-Если окажется, что недоступны и overlay/panel, и webview-подобная поверхность, MVP всё равно может выйти как command-first operational plugin с file-first core и минимальным details surface до появления richer host API.
+- `agent`
+- `skill`
+- `mcp`
+- `tool`
 
-Это не меняет продуктовую цель, но убирает риск строить design на несуществующем API.
+### Required UX outcome
 
-## 8. Agent and skill model
+- resources discoverятся из project/host context;
+- resources можно назначать и снимать с задач;
+- изменение сохраняется в source-of-truth;
+- UI показывает assigned/required resources без рассинхронизации с файлами.
 
-MVP поддерживает три источника агентских сущностей:
+### Scope decision
 
-- local project agents;
-- host-level registry;
-- ad hoc manually added agents.
+Для MVP сначала нужен **persisted form-based assignment flow**.
+Drag/drop resources — desirable, но не должен блокировать завершение корректного persisted workflow.
 
-Карточка может содержать:
+## 9. Multi-project strategy
 
-- `assignees`
-- `required_agents`
-- `required_skills`
+### In scope
 
-Эти поля участвуют в:
+- список известных OpenCode проектов;
+- default current project = active project OpenCode;
+- manual switch to another project in companion app;
+- full edit mode after switch.
 
-- preflight checks;
-- explainability UI;
-- orchestration routing.
+### Out of scope
 
-### Agent registry sync policy
+- единый board с карточками всех проектов вперемешку;
+- параллельный multi-project editing в одном runtime view;
+- distributed sync across remote hosts.
 
-Приоритет источников registry в MVP:
+## 10. Replan priorities
 
-1. local project agents
-2. host-level registry
-3. ad hoc agents
+### Priority 1 — functional contract recovery
 
-Правила:
+- task create/update payload alignment
+- persisted resource assignment
 
-- local project agents имеют приоритет при совпадении `id`
-- host-level registry используется как fallback/source enrichment
-- ad hoc agent создаётся явно пользователем и сохраняется в project-local source рядом с board metadata
-- ad hoc agent не переписывает local agent, а живёт как отдельная запись
-- при конфликте отображается warning и требуется user resolution
+### Priority 2 — live runtime completion
 
-## 9. UI states
+- board/task notifications → frontend refresh
 
-Обязательные состояния UI:
+### Priority 3 — companion integration
 
-- `loading` — идёт discovery/load/watcher sync
-- `empty` — task source не найден или board пуст
-- `error` — parse/adapter/host/UI error
-- `success` — board loaded
+- current project binding
+- manual project switching
+- project catalog
 
-Карточка дополнительно имеет micro-states:
+### Priority 4 — host-native UX
 
-- normal
-- blocked
-- pending-preflight
-- syncing
-- stale/conflicted
+- theme/font context
+- command/hotkey/auto-launch hardening
 
-## 10. Error handling
+### Priority 5 — polish
 
-- Ошибка в одном task file не должна ломать весь board
-- Parse errors должны отображаться как contextual diagnostics
-- Конфликт записи должен быть виден как recoverable error
-- Host integration failure не должен ломать file-based core
+- accessibility
+- keyboard refinement
+- visual cleanup
 
-## 10a. Orchestration event contract
+## 11. Verification strategy
 
-### Event schema
+### Contract verification
 
-Минимальный payload runtime event:
+- desktop UI payloads match sidecar schemas
+- create/edit/resource actions persist into task files
 
-- `event_id`
-- `correlation_id`
-- `task_id`
-- `from_status`
-- `to_status`
-- `timestamp`
-- `source_file`
-- `initiator` (`user` | `agent` | `system`)
-- `preflight_result` (`passed` | `failed` | `skipped`)
+### Runtime verification
 
-### Delivery semantics
+- file watcher notifications refresh board in UI
+- project switching rebinds board to selected project
 
-- file write — обязательная часть MVP и source of truth;
-- runtime event — best-effort дополнительный сигнал;
-- bridge обязан быть idempotent по `event_id`;
-- если runtime publish не удался, file write не откатывается автоматически;
-- ошибка publish логируется и отображается как recoverable warning.
+### Integration verification
 
-### Correlation
+- OpenCode plugin install works
+- tool-triggered open board launches companion app on active project
+- manual switch to another known project remains writable
 
-- один status transition получает свой `correlation_id`
-- все bridge side-effects используют тот же `correlation_id`
+### UX verification
 
-## 10b. Kanban execution contract
+- host theme/font context applied when available
+- fallback theme clearly works when host context absent
 
-Orchestrator и single-agent mode должны подчиняться одному operational contract:
+## 12. Main risks
 
-1. Task start разрешён только из карточки или её canonical source record.
-2. `planned -> active` всегда проходит preflight.
-3. Blocker обязан записываться в task source, а не только в runtime log.
-4. Переход в `review` требует наличия артефактов/ссылок на результат.
-5. Любой side-channel execution должен помечаться как exception и синхронизироваться обратно в kanban.
+### R1. Plugin-launch and desktop runtime diverge on project context
 
-## 11. Testing strategy
+Mitigation: explicit launch contract and tests around `--directory` / active project binding.
 
-### Unit
+### R2. Resource flow remains cosmetic
 
-- discovery priority
-- canonical normalization
-- transition rules
-- preflight outcomes
-- repository adapter parsing/writing
+Mitigation: no polishing before persisted resource assignment is implemented and tested.
 
-### Integration
+### R3. Doc drift returns
 
-- file watcher -> UI refresh
-- status change -> file write -> event publish
-- multiple source candidates -> correct primary selection
-
-### UI
-
-- board loading/empty/error/success states
-- keyboard navigation
-- drag-and-drop transition handling
-- blocker explanation visibility
-
-### Acceptance
-
-- end-to-end сценарий: discovered board -> move to active -> preflight -> write -> orchestration event
-
-## 12. Main implementation risk register
-
-### T1. UI surface mismatch with OpenCode plugin API
-
-Mitigation: first implementation slice — host capability spike.
-
-### T2. Partial writes / file corruption
-
-Mitigation: repository layer with atomic writes where possible and validation before save.
-
-### T3. Drift between external task formats and canonical model
-
-Mitigation: adapter isolation + recommended canonical format + migration helpers later.
+Mitigation: docs updated together with each replan slice and verified against code.

@@ -8,7 +8,13 @@ vi.mock('../../packages/desktop/src/lib/rpc.js', () => ({
   resourceApi: { discover: vi.fn(), list: vi.fn() },
 }));
 
+// Mock @tauri-apps/api/event
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn(),
+}));
+
 import { boardApi, taskApi, resourceApi } from '../../packages/desktop/src/lib/rpc.js';
+import { listen } from '@tauri-apps/api/event';
 
 // Board store tests
 import {
@@ -20,6 +26,8 @@ import {
   getSelectedTaskId,
   getSelectedTask,
   getTasksByStatus,
+  subscribeBoardChanged,
+  subscribeTaskChanged,
 } from '../../packages/desktop/src/lib/stores/board.svelte.js';
 
 // Resource store tests
@@ -44,6 +52,7 @@ import {
 const mockBoardApi = vi.mocked(boardApi);
 const mockTaskApi = vi.mocked(taskApi);
 const mockResourceApi = vi.mocked(resourceApi);
+const mockListen = vi.mocked(listen);
 
 describe('board store', () => {
   beforeEach(() => {
@@ -190,6 +199,319 @@ describe('board store', () => {
     const task = getSelectedTask();
     // Either null (board not success) or a TaskCard
     expect(task === null || typeof task === 'object').toBe(true);
+  });
+});
+
+describe('subscribeBoardChanged', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls listen with sidecar:board.changed event name', async () => {
+    const mockUnlisten = vi.fn();
+    mockListen.mockResolvedValueOnce(mockUnlisten);
+    mockBoardApi.load.mockResolvedValue({
+      ok: true,
+      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+    });
+
+    await subscribeBoardChanged();
+
+    expect(mockListen).toHaveBeenCalledTimes(1);
+    expect(mockListen).toHaveBeenCalledWith('sidecar:board.changed', expect.any(Function));
+  });
+
+  it('calls loadBoard when sidecar:board.changed event fires', async () => {
+    const mockUnlisten = vi.fn();
+    let capturedHandler: ((event: any) => void) | undefined;
+
+    mockListen.mockImplementationOnce(async (_eventName: any, handler: any) => {
+      capturedHandler = handler;
+      return mockUnlisten;
+    });
+    mockBoardApi.load.mockResolvedValue({
+      ok: true,
+      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+    });
+
+    await subscribeBoardChanged();
+
+    // Reset to track only calls triggered by the event
+    mockBoardApi.load.mockClear();
+    mockBoardApi.load.mockResolvedValue({
+      ok: true,
+      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+    });
+
+    // Simulate the Tauri event firing
+    capturedHandler!({ event: 'sidecar:board.changed', id: 1, payload: {} });
+
+    // loadBoard is async but the handler calls it — give it a tick
+    await vi.waitFor(() => {
+      expect(mockBoardApi.load).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('returns an unlisten function for cleanup', async () => {
+    const mockUnlisten = vi.fn();
+    mockListen.mockResolvedValueOnce(mockUnlisten);
+
+    const unlisten = await subscribeBoardChanged();
+
+    expect(typeof unlisten).toBe('function');
+    unlisten();
+    expect(mockUnlisten).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('subscribeTaskChanged', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls listen with sidecar:task.changed event name', async () => {
+    const mockUnlisten = vi.fn();
+    mockListen.mockResolvedValueOnce(mockUnlisten);
+
+    await subscribeTaskChanged();
+
+    expect(mockListen).toHaveBeenCalledTimes(1);
+    expect(mockListen).toHaveBeenCalledWith('sidecar:task.changed', expect.any(Function));
+  });
+
+  it('returns an unlisten function for cleanup', async () => {
+    const mockUnlisten = vi.fn();
+    mockListen.mockResolvedValueOnce(mockUnlisten);
+
+    const unlisten = await subscribeTaskChanged();
+
+    expect(typeof unlisten).toBe('function');
+    unlisten();
+    expect(mockUnlisten).toHaveBeenCalledTimes(1);
+  });
+
+  it('changeType "changed" does partial refresh', async () => {
+    const mockUnlisten = vi.fn();
+    let capturedHandler: ((event: any) => void) | undefined;
+
+    // First: load board into success state
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'Original', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' }],
+        statuses: ['planned', 'active', 'done'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+
+    // Setup listen mock to capture handler
+    mockListen.mockImplementationOnce(async (_eventName: any, handler: any) => {
+      capturedHandler = handler;
+      return mockUnlisten;
+    });
+
+    await subscribeTaskChanged();
+
+    // Setup taskApi.get to return updated task
+    mockTaskApi.get.mockResolvedValueOnce({
+      ok: true,
+      data: { id: 't1', title: 'Updated', status: 'active', source_file: 'a.md', updated_at: '2024-01-02' },
+    });
+
+    // Clear boardApi.load to track if it gets called
+    mockBoardApi.load.mockClear();
+
+    // Fire the event
+    capturedHandler!({ event: 'sidecar:task.changed', id: 1, payload: { taskId: 't1', changeType: 'changed' } });
+
+    // Wait for the async handler to complete and update the state
+    await vi.waitFor(() => {
+      const state = getBoardState();
+      expect(state.state).toBe('success');
+      if (state.state === 'success') {
+        expect(state.tasks[0].title).toBe('Updated');
+      }
+    });
+
+    expect(mockTaskApi.get).toHaveBeenCalledWith('t1');
+
+    // boardApi.load should NOT be called (partial refresh)
+    expect(mockBoardApi.load).not.toHaveBeenCalled();
+
+    // Board state should have the updated task
+    const state = getBoardState();
+    expect(state.state).toBe('success');
+    if (state.state === 'success') {
+      expect(state.tasks[0].title).toBe('Updated');
+      expect(state.tasks[0].status).toBe('active');
+    }
+  });
+
+  it('changeType "added" calls loadBoard', async () => {
+    const mockUnlisten = vi.fn();
+    let capturedHandler: ((event: any) => void) | undefined;
+
+    mockListen.mockImplementationOnce(async (_eventName: any, handler: any) => {
+      capturedHandler = handler;
+      return mockUnlisten;
+    });
+
+    await subscribeTaskChanged();
+
+    mockBoardApi.load.mockClear();
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+    });
+
+    capturedHandler!({ event: 'sidecar:task.changed', id: 1, payload: { taskId: 't1', changeType: 'added' } });
+
+    await vi.waitFor(() => {
+      expect(mockBoardApi.load).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('changeType "removed" calls loadBoard', async () => {
+    const mockUnlisten = vi.fn();
+    let capturedHandler: ((event: any) => void) | undefined;
+
+    mockListen.mockImplementationOnce(async (_eventName: any, handler: any) => {
+      capturedHandler = handler;
+      return mockUnlisten;
+    });
+
+    await subscribeTaskChanged();
+
+    mockBoardApi.load.mockClear();
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+    });
+
+    capturedHandler!({ event: 'sidecar:task.changed', id: 1, payload: { taskId: 't1', changeType: 'removed' } });
+
+    await vi.waitFor(() => {
+      expect(mockBoardApi.load).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('falls back to loadBoard when board not in success state', async () => {
+    const mockUnlisten = vi.fn();
+    let capturedHandler: ((event: any) => void) | undefined;
+
+    // Put board into error state
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: false,
+      error: { code: -1, message: 'fail' },
+    });
+    await loadBoard();
+    expect(getBoardState().state).toBe('error');
+
+    mockListen.mockImplementationOnce(async (_eventName: any, handler: any) => {
+      capturedHandler = handler;
+      return mockUnlisten;
+    });
+
+    await subscribeTaskChanged();
+
+    mockBoardApi.load.mockClear();
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+    });
+
+    capturedHandler!({ event: 'sidecar:task.changed', id: 1, payload: { taskId: 't1', changeType: 'changed' } });
+
+    await vi.waitFor(() => {
+      expect(mockBoardApi.load).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('falls back to loadBoard when taskApi.get fails', async () => {
+    const mockUnlisten = vi.fn();
+    let capturedHandler: ((event: any) => void) | undefined;
+
+    // Put board into success state
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'A', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' }],
+        statuses: ['planned'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+
+    mockListen.mockImplementationOnce(async (_eventName: any, handler: any) => {
+      capturedHandler = handler;
+      return mockUnlisten;
+    });
+
+    await subscribeTaskChanged();
+
+    // taskApi.get fails
+    mockTaskApi.get.mockResolvedValueOnce({
+      ok: false,
+      error: { code: -1, message: 'not found' },
+    });
+
+    mockBoardApi.load.mockClear();
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+    });
+
+    capturedHandler!({ event: 'sidecar:task.changed', id: 1, payload: { taskId: 't1', changeType: 'changed' } });
+
+    await vi.waitFor(() => {
+      expect(mockBoardApi.load).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('falls back to loadBoard when task not found in current state', async () => {
+    const mockUnlisten = vi.fn();
+    let capturedHandler: ((event: any) => void) | undefined;
+
+    // Put board into success state with task t1
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [{ id: 't1', title: 'A', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' }],
+        statuses: ['planned'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+
+    mockListen.mockImplementationOnce(async (_eventName: any, handler: any) => {
+      capturedHandler = handler;
+      return mockUnlisten;
+    });
+
+    await subscribeTaskChanged();
+
+    // taskApi.get succeeds for t99
+    mockTaskApi.get.mockResolvedValueOnce({
+      ok: true,
+      data: { id: 't99', title: 'Unknown', status: 'planned', source_file: 'x.md', updated_at: '2024-01-01' },
+    });
+
+    mockBoardApi.load.mockClear();
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: { state: 'success' as const, tasks: [], statuses: [], diagnostics: [] },
+    });
+
+    // Fire event for t99, which is NOT in the board
+    capturedHandler!({ event: 'sidecar:task.changed', id: 1, payload: { taskId: 't99', changeType: 'changed' } });
+
+    await vi.waitFor(() => {
+      expect(mockBoardApi.load).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

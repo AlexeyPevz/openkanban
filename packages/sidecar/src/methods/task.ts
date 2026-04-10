@@ -5,6 +5,8 @@ import {
   updateTask,
   updateTaskStatus,
   canTransition,
+  TaskPrioritySchema,
+  ResourceAssignmentSchema,
   TaskStatusSchema,
 } from '@openkanban/core';
 import type { MethodRegistry } from './index.js';
@@ -20,6 +22,9 @@ const TaskGetParamsSchema = z.object({
 const TaskCreateParamsSchema = z.object({
   title: z.string().min(1),
   status: TaskStatusSchema.optional(),
+  description: z.string().optional(),
+  priority: TaskPrioritySchema.optional(),
+  resources: z.array(ResourceAssignmentSchema).optional(),
 }).strict();
 
 const TaskMoveParamsSchema = z.object({
@@ -30,6 +35,9 @@ const TaskMoveParamsSchema = z.object({
 const TaskUpdateParamsSchema = z.object({
   id: z.string().min(1),
   title: z.string().optional(),
+  description: z.string().optional(),
+  priority: TaskPrioritySchema.optional(),
+  resources: z.array(ResourceAssignmentSchema).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).strict();
 
@@ -62,8 +70,14 @@ export function createTaskMethods(rootDir: string): MethodRegistry {
     },
 
     'task.create': async (params) => {
-      const { title, status } = validate(TaskCreateParamsSchema, params, 'task.create');
-      return createTask(repo, { title, status: status ?? 'planned' });
+      const { title, status, description, priority, resources } = validate(TaskCreateParamsSchema, params, 'task.create');
+      return createTask(repo, {
+        title,
+        status: status ?? 'planned',
+        description,
+        priority,
+        resources,
+      });
     },
 
     'task.move': async (params) => {
