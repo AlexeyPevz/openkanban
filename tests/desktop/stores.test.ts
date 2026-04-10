@@ -718,6 +718,117 @@ describe('subscribeTaskChanged', () => {
   });
 });
 
+describe('e2e watcher → UI refresh', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sidecar task.changed event updates board, selectedTask and tasksByStatus without loading flash', async () => {
+    // 1. Load board into success state with two tasks
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [
+          { id: 't1', title: 'Task A', status: 'planned', source_file: 'a.md', updated_at: '2024-01-01' },
+          { id: 't2', title: 'Task B', status: 'planned', source_file: 'b.md', updated_at: '2024-01-01' },
+        ],
+        statuses: ['planned', 'active', 'done'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+    expect(getBoardState().state).toBe('success');
+    expect(getTasksByStatus('planned')).toHaveLength(2);
+    expect(getTasksByStatus('active')).toHaveLength(0);
+
+    // 2. Select task t1 (simulates user selecting a task in UI)
+    selectTask('t1');
+    expect(getSelectedTask()?.title).toBe('Task A');
+    expect(getSelectedTask()?.status).toBe('planned');
+
+    // 3. Activate BOTH subscriptions (like App.svelte onMount does)
+    let boardEventHandler: ((event: any) => void) | undefined;
+    let taskEventHandler: ((event: any) => void) | undefined;
+
+    const mockBoardUnlisten = vi.fn();
+    const mockTaskUnlisten = vi.fn();
+
+    mockListen
+      .mockImplementationOnce(async (_eventName: any, handler: any) => {
+        boardEventHandler = handler;
+        return mockBoardUnlisten;
+      })
+      .mockImplementationOnce(async (_eventName: any, handler: any) => {
+        taskEventHandler = handler;
+        return mockTaskUnlisten;
+      });
+
+    const boardUnsub = subscribeBoardChanged();
+    const taskUnsub = subscribeTaskChanged();
+    await boardUnsub;
+    await taskUnsub;
+
+    // Verify both handlers captured
+    expect(boardEventHandler).toBeDefined();
+    expect(taskEventHandler).toBeDefined();
+
+    // 4. Simulate sidecar emitting task.changed: t1 moved from planned → active
+    mockTaskApi.get.mockResolvedValueOnce({
+      ok: true,
+      data: { id: 't1', title: 'Task A', status: 'active', source_file: 'a.md', updated_at: '2024-01-02' },
+    });
+
+    // Track states during the event handling (no loading flash)
+    const statesDuringRefresh: string[] = [];
+    const interval = setInterval(() => {
+      statesDuringRefresh.push(getBoardState().state);
+    }, 0);
+
+    // Fire the task.changed event
+    taskEventHandler!({
+      event: 'sidecar:task.changed',
+      id: 1,
+      payload: { taskId: 't1', changeType: 'changed' },
+    });
+
+    // Wait for async handler to complete
+    await vi.waitFor(() => {
+      expect(mockTaskApi.get).toHaveBeenCalledWith('t1');
+      const state = getBoardState();
+      if (state.state === 'success') {
+        expect(state.tasks.find((t: any) => t.id === 't1')?.status).toBe('active');
+      }
+    });
+
+    clearInterval(interval);
+
+    // 5. VERIFY: No loading flash
+    expect(statesDuringRefresh.every((s) => s !== 'loading')).toBe(true);
+
+    // 6. VERIFY: Board state reflects the change
+    const finalState = getBoardState();
+    expect(finalState.state).toBe('success');
+    if (finalState.state === 'success') {
+      expect(finalState.tasks).toHaveLength(2);
+      const t1 = finalState.tasks.find((t) => t.id === 't1');
+      expect(t1?.status).toBe('active');
+      expect(t1?.updated_at).toBe('2024-01-02');
+    }
+
+    // 7. VERIFY: selectedTask (derived) reflects updated task
+    const selected = getSelectedTask();
+    expect(selected).not.toBeNull();
+    expect(selected?.id).toBe('t1');
+    expect(selected?.status).toBe('active');
+
+    // 8. VERIFY: getTasksByStatus (derived) reflects the move
+    expect(getTasksByStatus('planned')).toHaveLength(1);
+    expect(getTasksByStatus('active')).toHaveLength(1);
+    expect(getTasksByStatus('active')[0].id).toBe('t1');
+  });
+});
+
 describe('resources store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
