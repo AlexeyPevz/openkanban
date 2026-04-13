@@ -3,6 +3,8 @@ import { createResourceRegistry, ResourceKindSchema, TaskMarkdownRepository, upd
 import type { ResourceRecord } from '@openkanban/core';
 import { discoverResources } from '../discovery/discover-resources.js';
 import type { MethodRegistry } from './index.js';
+import type { ProjectRootInput } from '../runtime.js';
+import { getProjectRoot } from '../runtime.js';
 
 // --- Zod param schemas ---
 
@@ -26,18 +28,26 @@ function validate<T>(schema: z.ZodType<T>, params: unknown, method: string): T {
   return result.data;
 }
 
-export function createResourceMethods(projectDir: string): MethodRegistry {
+export function createResourceMethods(root: ProjectRootInput): MethodRegistry {
   let records: ResourceRecord[] = [];
-  const repo = new TaskMarkdownRepository(projectDir);
+  let recordsRoot: string | null = null;
+  const getRepo = () => new TaskMarkdownRepository(getProjectRoot(root));
 
   return {
     'resources.discover': async () => {
+      const projectDir = getProjectRoot(root);
       const discovered = discoverResources(projectDir);
       records = discovered;
+      recordsRoot = projectDir;
       return discovered;
     },
 
     'resources.list': async (params) => {
+      const projectDir = getProjectRoot(root);
+      if (recordsRoot !== projectDir) {
+        records = [];
+        recordsRoot = projectDir;
+      }
       const { kind } = validate(ResourcesListParamsSchema, params, 'resources.list');
       const registry = createResourceRegistry(records);
       if (kind) {
@@ -48,6 +58,7 @@ export function createResourceMethods(projectDir: string): MethodRegistry {
 
     'resources.assign': async (params) => {
       const { taskId, kind, name } = validate(ResourcesAssignParamsSchema, params, 'resources.assign');
+      const repo = getRepo();
 
       const task = await repo.loadTaskById(taskId);
       if (!task) {
@@ -76,6 +87,7 @@ export function createResourceMethods(projectDir: string): MethodRegistry {
 
     'resources.unassign': async (params) => {
       const { taskId, kind, name } = validate(ResourcesAssignParamsSchema, params, 'resources.unassign');
+      const repo = getRepo();
 
       const task = await repo.loadTaskById(taskId);
       if (!task) {

@@ -41,6 +41,10 @@ fn parse_directory_arg() -> Option<String> {
     parse_directory_from_args(&args)
 }
 
+fn maybe_launch_directory_event(args: &[String]) -> Option<String> {
+    parse_directory_from_args(args)
+}
+
 fn resolve_sidecar_path(app: &tauri::App) -> Result<String, Box<dyn std::error::Error>> {
     if cfg!(debug_assertions) {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -61,6 +65,7 @@ fn start_sidecar(sidecar_path: &str, project_dir: Option<&str>) -> Result<Child,
 
     if let Some(dir) = project_dir {
         cmd.current_dir(dir);
+        cmd.env("OPENKANBAN_PROJECT_DIR", dir);
     }
 
     cmd.stdin(Stdio::piped())
@@ -199,6 +204,20 @@ fn main() {
     let project_dir = parse_directory_arg();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if let Some(dir) = maybe_launch_directory_event(&args) {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_focus();
+                }
+
+                let state: State<SidecarState> = app.state();
+                if let Ok(mut project_dir) = state.project_dir.lock() {
+                    *project_dir = Some(dir.clone());
+                }
+
+                let _ = app.emit("launch:directory", dir);
+            }
+        }))
         .manage(SidecarState {
             child: Mutex::new(None),
             stdin_lock: Mutex::new(()),
@@ -286,5 +305,11 @@ mod tests {
     fn parse_directory_from_args_returns_none_when_no_value() {
         let args = vec!["binary".into(), "--directory".into()];
         assert_eq!(parse_directory_from_args(&args), None);
+    }
+
+    #[test]
+    fn maybe_launch_directory_event_returns_directory_for_repeat_launch() {
+        let args = vec!["binary".into(), "--directory".into(), "/next/project".into()];
+        assert_eq!(maybe_launch_directory_event(&args), Some("/next/project".to_string()));
     }
 }

@@ -1,8 +1,10 @@
 <script lang="ts">
   import Board from './lib/components/Board.svelte';
   import ShortcutsHelp from './lib/components/ShortcutsHelp.svelte';
+  import { listen } from '@tauri-apps/api/event';
   import { loadPreset, getThemeName, toggleTheme } from './lib/stores/theme.svelte.js';
   import { subscribeBoardChanged, subscribeTaskChanged } from './lib/stores/board.svelte.js';
+  import { initializeActiveProject, handleLaunchDirectory } from './lib/stores/project.svelte.js';
   import { shortcuts } from './lib/actions/shortcuts.js';
   import { onMount } from 'svelte';
 
@@ -10,15 +12,20 @@
 
   onMount(() => {
     loadPreset('opencode');
+    void initializeActiveProject();
 
     // Subscribe to live sync events from sidecar
     const boardUnlistenPromise = subscribeBoardChanged();
     const taskUnlistenPromise = subscribeTaskChanged();
+    const launchUnlistenPromise = listen<string>('launch:directory', (event) => {
+      void handleLaunchDirectory(event.payload);
+    });
 
     return () => {
       // Cleanup: unlisten on unmount
       boardUnlistenPromise.then((unlisten) => unlisten());
       taskUnlistenPromise.then((unlisten) => unlisten());
+      launchUnlistenPromise.then((unlisten) => unlisten());
     };
   });
 
