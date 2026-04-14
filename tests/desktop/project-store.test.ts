@@ -12,16 +12,23 @@ vi.mock('../../packages/desktop/src/lib/stores/board.svelte.js', () => ({
   refreshBoard: vi.fn(),
 }));
 
+vi.mock('../../packages/desktop/src/lib/stores/project-catalog.svelte.js', () => ({
+  upsertOpenedProject: vi.fn(),
+}));
+
 import { projectApi } from '../../packages/desktop/src/lib/rpc.js';
 import { refreshBoard } from '../../packages/desktop/src/lib/stores/board.svelte.js';
+import { upsertOpenedProject } from '../../packages/desktop/src/lib/stores/project-catalog.svelte.js';
 import {
   getActiveProject,
   initializeActiveProject,
   handleLaunchDirectory,
+  switchProject,
 } from '../../packages/desktop/src/lib/stores/project.svelte.js';
 
 const mockProjectApi = vi.mocked(projectApi);
 const mockRefreshBoard = vi.mocked(refreshBoard);
+const mockUpsertOpenedProject = vi.mocked(upsertOpenedProject);
 
 describe('project store', () => {
   beforeEach(() => {
@@ -36,6 +43,7 @@ describe('project store', () => {
 
     await initializeActiveProject();
     expect(getActiveProject()).toBe('/project-a');
+    expect(mockUpsertOpenedProject).toHaveBeenCalledWith('/project-a');
   });
 
   it('handleLaunchDirectory does nothing for same directory', async () => {
@@ -49,6 +57,7 @@ describe('project store', () => {
 
     expect(mockProjectApi.rebind).not.toHaveBeenCalled();
     expect(mockRefreshBoard).not.toHaveBeenCalled();
+    expect(mockUpsertOpenedProject).toHaveBeenCalledTimes(1);
     expect(getActiveProject()).toBe('/project-a');
   });
 
@@ -67,6 +76,7 @@ describe('project store', () => {
     await handleLaunchDirectory('/project-b');
 
     expect(mockProjectApi.rebind).toHaveBeenCalledWith('/project-b');
+    expect(mockUpsertOpenedProject).toHaveBeenCalledWith('/project-b');
     expect(mockRefreshBoard).toHaveBeenCalledTimes(1);
     expect(getActiveProject()).toBe('/project-b');
   });
@@ -86,6 +96,48 @@ describe('project store', () => {
     await handleLaunchDirectory('/project-b');
 
     expect(getActiveProject()).toBe('/project-a');
+    expect(mockUpsertOpenedProject).toHaveBeenCalledTimes(1);
+    expect(mockRefreshBoard).not.toHaveBeenCalled();
+  });
+
+  it('switchProject successfully rebinds, refreshes board, and returns success', async () => {
+    mockProjectApi.current.mockResolvedValueOnce({
+      ok: true,
+      data: { directory: '/project-a' },
+    });
+    await initializeActiveProject();
+
+    mockProjectApi.rebind.mockResolvedValueOnce({
+      ok: true,
+      data: { directory: '/project-b', rebound: true },
+    });
+
+    const result = await switchProject('/project-b');
+
+    expect(result).toEqual({ ok: true });
+    expect(getActiveProject()).toBe('/project-b');
+    expect(mockProjectApi.rebind).toHaveBeenCalledWith('/project-b');
+    expect(mockUpsertOpenedProject).toHaveBeenCalledWith('/project-b');
+    expect(mockRefreshBoard).toHaveBeenCalledTimes(1);
+  });
+
+  it('switchProject preserves previous active project on rebind failure and returns error', async () => {
+    mockProjectApi.current.mockResolvedValueOnce({
+      ok: true,
+      data: { directory: '/project-a' },
+    });
+    await initializeActiveProject();
+
+    mockProjectApi.rebind.mockResolvedValueOnce({
+      ok: false,
+      error: { code: -1, message: 'rebind failed' },
+    });
+
+    const result = await switchProject('/project-b');
+
+    expect(result).toEqual({ ok: false, error: 'rebind failed' });
+    expect(getActiveProject()).toBe('/project-a');
+    expect(mockUpsertOpenedProject).toHaveBeenCalledTimes(1);
     expect(mockRefreshBoard).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,8 @@ It covers:
 - initial launch argument passing;
 - repeat launch delivery to an already-running app instance;
 - runtime project rebinding in sidecar without sidecar process restart;
+- desktop-local known-projects catalog refresh on successful open/rebind;
+- desktop project picker sidebar for manual project switching and add/open flow;
 - duplicate-launch prevention on plugin side.
 
 ## Overview
@@ -106,7 +108,60 @@ Frontend listens for `launch:directory` and coordinates switch via RPC:
 2. if directory equals current active project -> no-op;
 3. otherwise calls `project.rebind`;
 4. commits active project state only after success ack;
-5. refreshes board.
+5. upserts successful project into desktop-local known-projects catalog;
+6. refreshes board.
+
+## 3.1 Desktop project catalog source
+
+**Files:**
+
+- `packages/desktop/src-tauri/src/project_catalog.rs`
+- `packages/desktop/src/lib/catalog.ts`
+- `packages/desktop/src/lib/stores/project-catalog.svelte.ts`
+
+Desktop now maintains a companion-global known-projects registry in the Tauri
+app data directory.
+
+### Registry location and format
+
+- physical location: `app_handle.path().app_data_dir()/projects.json`
+- missing file is treated as empty catalog
+- file format:
+
+```json
+{ "projects": [] }
+```
+
+### Record shape
+
+```json
+{
+  "projectPath": "/abs/path/to/project",
+  "name": "Project Name",
+  "lastOpenedAt": "2026-04-13T21:00:00Z",
+  "source": "opened",
+  "isAvailable": true
+}
+```
+
+### Merge and validity rules
+
+- `projectPath` is the identity key;
+- `opened` outranks `discovered`;
+- `lastOpenedAt` updates only on successful opened upsert;
+- `name` falls back to basename when explicit name is unavailable;
+- `isAvailable` is `true` only when directory exists and contains either:
+  - `.tasks/`
+  - `opencode.json`
+
+### Command surface
+
+Desktop exposes direct Tauri commands for the catalog source:
+
+- `catalog_list_projects`
+- `catalog_upsert_opened_project`
+
+These commands are desktop-local and intentionally bypass sidecar JSON-RPC.
 
 ## 4. Sidecar Side (Runtime project binding)
 
@@ -192,8 +247,10 @@ So startup behavior is deterministic even if cwd and launch intent diverge.
 
 1. plugin launches desktop with `--directory`;
 2. desktop starts sidecar with `current_dir` = directory;
-3. frontend initializes active project via `project.current`;
-4. board loads from that project.
+3. frontend hydrates project catalog from desktop registry;
+4. frontend initializes active project via `project.current`;
+5. successful current project is upserted into desktop registry;
+6. board loads from that project.
 
 ### Scenario B: app already running
 
@@ -202,7 +259,8 @@ So startup behavior is deterministic even if cwd and launch intent diverge.
 3. desktop emits `launch:directory`;
 4. frontend calls `project.rebind`;
 5. sidecar rebinds watcher/runtime root;
-6. frontend refreshes board and updates active project.
+6. frontend upserts successful target project into desktop registry;
+7. frontend refreshes board and updates active project.
 
 ## 6. Error Handling
 
@@ -231,6 +289,13 @@ So startup behavior is deterministic even if cwd and launch intent diverge.
   - `parse_directory_from_args_returns_none_when_missing`
   - `parse_directory_from_args_returns_none_when_no_value`
   - `maybe_launch_directory_event_returns_directory_for_repeat_launch`
+- `packages/desktop/src-tauri/src/project_catalog.rs` unit tests:
+  - empty registry default / missing file => empty registry
+  - `opened` outranks `discovered`
+  - `lastOpenedAt` updates only on opened upsert
+  - RFC3339 timestamp generation
+  - validity rules for `.tasks/` / `opencode.json`
+  - load/upsert helpers for catalog registry
 
 ### Sidecar
 
@@ -244,10 +309,26 @@ So startup behavior is deterministic even if cwd and launch intent diverge.
 
 - `tests/desktop/rpc.test.ts`
   - `projectApi.current` / `projectApi.rebind` wrappers
+- `tests/desktop/catalog.test.ts`
+  - `catalog_list_projects` / `catalog_upsert_opened_project` wrappers
+  - catalog store hydration and in-memory upsert
+  - startup orchestration loads catalog before active-project init
 - `tests/desktop/project-store.test.ts`
+  - current project init upserts successful project into catalog
   - launch-directory same-path no-op
   - rebind + refresh on changed path
+  - successful rebind upserts project into catalog
   - keep previous active project on rebind failure
+- `tests/desktop/project-picker.test.ts`
+  - picker store visibility/sorting rules
+  - unavailable/switching/switch_error transitions
+  - folder picker add/open bridge behavior
+- `tests/desktop/project-sidebar.test.ts`
+  - permanent Projects sidebar rendering
+  - unavailable toggle behavior
+  - immediate switch on project click
+  - unavailable project state handling
+  - `Open/Add project...` cancel / invalid / valid flows
 
 ## 8. Current boundaries
 
@@ -255,10 +336,13 @@ In scope now:
 
 - one active project at a time;
 - runtime rebind without sidecar process restart;
-- launch-driven switching via `--directory`.
+- launch-driven switching via `--directory`;
+- companion-global known-projects registry sourced from successful open/rebind flow;
+- permanent desktop sidebar that reads the known-projects catalog;
+- immediate project switch by sidebar row click;
+- `Show unavailable` toggle for offline catalog entries;
+- `Open/Add project...` flow via folder picker, validation, catalog upsert and immediate switch.
 
 Out of scope (next slices):
 
-- project picker UI;
-- known-projects catalog;
 - multi-project board/session.

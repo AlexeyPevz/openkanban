@@ -8,6 +8,12 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::{AppHandle, Emitter, Manager, State};
 
+mod project_catalog;
+
+use project_catalog::{
+    catalog_list_projects, catalog_upsert_opened_project, catalog_validate_project_path,
+};
+
 struct SidecarState {
     child: Mutex<Option<Child>>,
     stdin_lock: Mutex<()>,
@@ -249,7 +255,12 @@ fn main() {
             spawn_stderr_logger(stderr);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![rpc_call])
+        .invoke_handler(tauri::generate_handler![
+            rpc_call,
+            catalog_list_projects,
+            catalog_upsert_opened_project,
+            catalog_validate_project_path
+        ])
         .on_window_event(|_window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 // Sidecar cleanup happens via Drop
