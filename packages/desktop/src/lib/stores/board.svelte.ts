@@ -1,4 +1,5 @@
 import { boardApi, taskApi, type BoardViewState } from '../rpc.js';
+import { listen } from '@tauri-apps/api/event';
 import type { TaskCard, CreateTaskInput, TaskPatch } from '@openkanban/core';
 
 let boardState = $state<BoardViewState>({ state: 'loading' });
@@ -24,6 +25,20 @@ export async function loadBoard(): Promise<void> {
   } else {
     boardState = { state: 'error', message: result.error.message };
   }
+}
+
+/** Silent refresh — fetches new data without flashing loading state.
+ *  If board is not in success state, falls back to loadBoard (shows loading).
+ *  On API failure while in success state, keeps current data silently. */
+export async function refreshBoard(): Promise<void> {
+  if (boardState.state !== 'success') {
+    return loadBoard();
+  }
+  const result = await boardApi.load();
+  if (result.ok) {
+    boardState = result.data;
+  }
+  // On failure: silently keep current data (no error flash)
 }
 
 export async function moveTask(id: string, status: string): Promise<boolean> {
@@ -64,4 +79,51 @@ export function getSelectedTask(): TaskCard | null {
 export function getTasksByStatus(status: string): TaskCard[] {
   if (boardState.state !== 'success') return [];
   return boardState.tasks.filter((t) => t.status === status);
+}
+
+/** Subscribe to sidecar:board.changed Tauri event. Returns unlisten cleanup function. */
+export async function subscribeBoardChanged(): Promise<() => void> {
+  const unlisten = await listen('sidecar:board.changed', () => {
+    refreshBoard();
+  });
+  return unlisten;
+}
+
+/** Subscribe to sidecar:task.changed Tauri event. Returns unlisten cleanup function. */
+export async function subscribeTaskChanged(): Promise<() => void> {
+  const unlisten = await listen<{ taskId: string; changeType: string }>(
+    'sidecar:task.changed',
+    async (event) => {
+      const { taskId, changeType } = event.payload;
+
+      if (changeType === 'added' || changeType === 'removed') {
+        refreshBoard();
+        return;
+      }
+
+      // changeType === 'changed' → attempt partial refresh
+      if (boardState.state !== 'success') {
+        refreshBoard();
+        return;
+      }
+
+      const result = await taskApi.get(taskId);
+      if (!result.ok) {
+        refreshBoard();
+        return;
+      }
+
+      const idx = boardState.tasks.findIndex((t) => t.id === taskId);
+      if (idx === -1) {
+        refreshBoard();
+        return;
+      }
+
+      // Merge: replace the task in place
+      const updatedTasks = [...boardState.tasks];
+      updatedTasks[idx] = result.data;
+      boardState = { ...boardState, tasks: updatedTasks };
+    },
+  );
+  return unlisten;
 }

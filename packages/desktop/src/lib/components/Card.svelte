@@ -13,15 +13,15 @@
   let resources = $derived(getTaskResources(task));
 </script>
 
-<article
+<!-- Card is mouse-clickable for convenience; keyboard access is via Open details / Edit buttons.
+     We intentionally avoid role="button" here to prevent nested-interactive-element conflict. -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<div
   class="card"
   class:blocked={!!task.blocked_reason}
-  role="listitem"
-  aria-label="Task: {task.title}"
   use:draggable={task.id}
   onclick={() => selectTask(task.id)}
-  onkeydown={(e) => e.key === 'Enter' && selectTask(task.id)}
-  tabindex="0"
 >
   <div class="card-header">
     <h3 class="card-title">{task.title}</h3>
@@ -46,6 +46,13 @@
 
   <div class="card-actions">
     <button
+      class="details-btn"
+      onclick={(e) => { e.stopPropagation(); selectTask(task.id); }}
+      aria-label="Open details for {task.title}"
+    >
+      Open details
+    </button>
+    <button
       class="edit-btn"
       onclick={(e) => { e.stopPropagation(); onEditTask(task.id); }}
       aria-label="Edit task {task.title}"
@@ -53,7 +60,7 @@
       Edit
     </button>
   </div>
-</article>
+</div>
 
 <style>
   .card {
@@ -157,6 +164,27 @@
     margin-top: 8px;
     display: flex;
     justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .details-btn {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px solid var(--kanban-card-border);
+    border-radius: 4px;
+    color: var(--kanban-text-secondary);
+    cursor: pointer;
+  }
+
+  .details-btn:hover {
+    color: var(--kanban-text);
+    border-color: var(--kanban-accent);
+  }
+
+  .details-btn:focus-visible {
+    outline: 2px solid var(--kanban-accent);
+    outline-offset: 2px;
   }
 
   .edit-btn {

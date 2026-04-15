@@ -6,7 +6,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 }));
 
 import { invoke } from '@tauri-apps/api/core';
-import { rpcCall, boardApi, taskApi, resourceApi } from '../../packages/desktop/src/lib/rpc.js';
+import { rpcCall, boardApi, taskApi, resourceApi, projectApi } from '../../packages/desktop/src/lib/rpc.js';
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -71,6 +71,22 @@ describe('API wrappers', () => {
     expect(mockInvoke).toHaveBeenCalledWith('rpc_call', {
       method: 'resources.discover',
       params: {},
+    });
+  });
+
+  it('projectApi.current calls project.current', async () => {
+    await projectApi.current();
+    expect(mockInvoke).toHaveBeenCalledWith('rpc_call', {
+      method: 'project.current',
+      params: {},
+    });
+  });
+
+  it('projectApi.rebind calls project.rebind with directory', async () => {
+    await projectApi.rebind('/tmp/next-project');
+    expect(mockInvoke).toHaveBeenCalledWith('rpc_call', {
+      method: 'project.rebind',
+      params: { directory: '/tmp/next-project' },
     });
   });
 });

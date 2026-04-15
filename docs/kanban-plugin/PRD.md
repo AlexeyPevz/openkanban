@@ -1,9 +1,15 @@
-# PRD — Kanban Plugin for Agentic IDEs MVP
+# PRD — OpenKanban for OpenCode MVP
+
+> **Status note:** исходная идея native host UI уточнена. Текущий целевой продукт — OpenCode plugin + отдельный Tauri companion app, запускаемый из OpenCode и синхронизированный с file-first task sources.
 
 ## 1. Product Scope
 
 ### In scope
 
+- OpenCode plugin installation and companion app launch flow;
+- companion desktop app as primary visual kanban surface;
+- default binding to the currently active OpenCode project;
+- manual in-app switching between known OpenCode projects with full edit capability;
 - auto-discovery task sources;
 - нормализация board и task data в единый internal model;
 - file watching и live refresh;
@@ -11,14 +17,15 @@
 - drag-and-drop / keyboard-driven статусные переходы;
 - preflight при переходе в `active`;
 - blocker explanation;
-- agent assignment metadata;
+- agent/resource assignment metadata;
 - required agents / required skills / gates metadata;
-- orchestration bridge для реакций на status changes.
+- orchestration bridge для реакций на status changes;
+- host/project config для theme, fonts, hotkeys и registry hints.
 
 ### Out of scope
 
 - внешние SaaS integrations;
-- multi-project global board;
+- единый aggregated global board по всем проектам одновременно;
 - historical analytics;
 - collaborative real-time multi-user editing;
 - remote execution transport.
@@ -39,10 +46,11 @@
 - `RULES.md`
 - `README.md`
 - host/project config для theme, fonts, hotkeys и registry hints
+- список известных проектов OpenCode и текущий active project context
 
 Если найдено несколько источников:
 
-- plugin выбирает primary source по приоритету и валидности;
+- plugin/core выбирает primary source по приоритету и валидности;
 - UI показывает, что выбрано;
 - пользователь может переопределить источник позже.
 
@@ -73,6 +81,7 @@
 - `progress`
 - `blocked_reason`
 - `artifacts`
+- `resources`
 
 ### Defaulting and normalization rules
 
@@ -106,9 +115,27 @@
 
 Система должна автоматически сканировать project root и находить поддерживаемые task sources.
 
+### FR1a. Current project binding
+
+При открытии board из OpenCode companion app должен по умолчанию открывать active project OpenCode.
+
+### FR1b. Multi-project switching
+
+Companion app должен уметь показывать список известных OpenCode проектов и позволять вручную переключаться между ними без смены active project в OpenCode.
+
+Ручное переключение должно оставаться полноценно редактируемым, а не read-only.
+
 ### FR2. Rendering
 
 Система должна показывать board с колонками и карточками в стиле хоста.
+
+### FR2a. Host launch surface
+
+Минимум в MVP:
+
+- plugin устанавливается в OpenCode;
+- board можно открыть из OpenCode командой/tool flow;
+- опционально поддерживается auto-launch companion app вместе с OpenCode, если включён соответствующий host/plugin flag.
 
 ### FR3. Sync from files
 
@@ -138,6 +165,10 @@
 - изменить `title` и `description`;
 - изменить metadata полей карточки;
 - записать изменения обратно в source-of-truth с валидацией.
+
+### FR4c. Resource assignment
+
+Пользователь должен иметь возможность назначать и снимать resources (agents / skills / MCP / tools) так, чтобы изменения сохранялись в source-of-truth, а не только в runtime state.
 
 ### FR5. Preflight gate
 
@@ -175,6 +206,15 @@ MVP должен поддерживать:
 - открытие деталей карточки;
 - ручной rescan.
 
+### FR7a. Companion navigation
+
+MVP должен поддерживать:
+
+- открыть board из OpenCode;
+- перейти к active project по умолчанию;
+- вручную переключить проект внутри companion app;
+- сохранить file-first workflow после переключения проекта.
+
 ### FR8. Explainability
 
 Карточка должна показывать текущий state, involved agents и blocker explanation.
@@ -185,6 +225,8 @@ MVP должен поддерживать:
 - Подача — минималистичная, преимущественно чёрно-белая
 - Необходимые UI states: `loading`, `empty`, `error`, `success`
 - Details view должен объяснять, что делает orchestrator по карточке
+- Companion app по умолчанию открывает active project OpenCode, но даёт явный project switcher для ручного перехода к другим проектам
+- Theme и fonts должны подтягиваться из host context, а fallback preset-ы допустимы только как degradable path
 
 ## 7. Card UX
 
@@ -193,7 +235,7 @@ MVP должен поддерживать:
 - title;
 - compact status;
 - progress indicator;
-- assigned/recommended agents;
+- assigned/recommended agents/resources;
 - blocker marker;
 - hover/details view.
 
@@ -209,14 +251,18 @@ Details view показывает:
 ## 8. Acceptance Criteria
 
 - Plugin поднимается без ручной конфигурации, если найден хотя бы один валидный task source
+- Из OpenCode можно открыть companion app для текущего проекта
+- Companion app по умолчанию показывает active project OpenCode
+- В companion app можно вручную переключиться на другой известный проект и полноценно редактировать его board
 - Board корректно обновляется от file watcher
 - Status change меняет source-of-truth в файле
 - Пользователь может создать карточку и увидеть её в canonical source-of-truth
 - Пользователь может отредактировать карточку и увидеть сохранённые изменения
+- Назначение resources сохраняется в source-of-truth
 - `planned -> active` запускает preflight
 - failed preflight переводит карточку в `blocked` с объяснением
 - Пользователь видит назначенных агентов и blocker explanation
-- Есть hotkey для открытия board
+- Есть command/tool path для открытия board; host hotkey — preferred, но допускается capability-dependent fallback
 - Если host runtime events доступны, orchestration bridge получает событие о смене статуса
 - Если host runtime events недоступны, workflow остаётся рабочим через file-change-first path
 - При нескольких найденных источниках система либо выбирает один по правилам, либо честно переходит в degraded mode

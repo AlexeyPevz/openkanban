@@ -62,3 +62,8 @@ export const resourceApi = {
   discover: () => rpcCall<ResourceRecord[]>('resources.discover'),
   list: () => rpcCall<ResourceRecord[]>('resources.list'),
 };
+
+export const projectApi = {
+  current: () => rpcCall<{ directory: string }>('project.current'),
+  rebind: (directory: string) => rpcCall<{ directory: string; rebound: boolean }>('project.rebind', { directory }),
+};

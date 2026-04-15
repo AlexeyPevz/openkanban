@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import matter from 'gray-matter';
@@ -123,6 +123,41 @@ describe('task methods', () => {
     expect(tasks).toHaveLength(2);
   });
 
+  it('task.create persists description, priority and resources', async () => {
+    const resources = [{ kind: 'skill', name: 'testing-tdd', required: true }];
+    const created = await taskMethods['task.create']({
+      title: 'Rich Task',
+      status: 'planned',
+      description: 'Rich Description',
+      priority: 'high',
+      resources,
+    });
+
+    expect(created).toMatchObject({
+      id: 'rich-task',
+      title: 'Rich Task',
+      status: 'planned',
+      description: 'Rich Description',
+      priority: 'high',
+      resources,
+    });
+
+    const persisted = await taskMethods['task.get']({ id: 'rich-task' });
+    expect(persisted).toMatchObject({
+      description: 'Rich Description',
+      priority: 'high',
+      resources,
+    });
+
+    const rawTask = await readFile(join(tmpDir, '.tasks', 'tasks', 'rich-task.md'), 'utf8');
+    const parsed = matter(rawTask);
+    expect(parsed.data).toMatchObject({
+      description: 'Rich Description',
+      priority: 'high',
+      resources,
+    });
+  });
+
   it('task.create rejects invalid params', async () => {
     await expect(
       taskMethods['task.create']({ title: 'Bad status', status: 'invalid-status' } as never),
@@ -155,5 +190,39 @@ describe('task methods', () => {
       title: 'Updated Title',
     });
     expect((updated as { title: string }).title).toBe('Updated Title');
+  });
+
+  it('task.update persists description, priority and resources', async () => {
+    const resources = [{ kind: 'agent', name: 'backend', required: false }];
+
+    const updated = await taskMethods['task.update']({
+      id: 'sample-task',
+      description: 'Updated Description',
+      priority: 'low',
+      resources,
+    });
+
+    expect(updated).toMatchObject({
+      id: 'sample-task',
+      description: 'Updated Description',
+      priority: 'low',
+      resources,
+    });
+
+    const tasks = (await taskMethods['task.list']({})) as Array<Record<string, unknown>>;
+    const persisted = tasks.find((task) => task.id === 'sample-task');
+    expect(persisted).toMatchObject({
+      description: 'Updated Description',
+      priority: 'low',
+      resources,
+    });
+
+    const rawTask = await readFile(join(tmpDir, '.tasks', 'tasks', 'sample-task.md'), 'utf8');
+    const parsed = matter(rawTask);
+    expect(parsed.data).toMatchObject({
+      description: 'Updated Description',
+      priority: 'low',
+      resources,
+    });
   });
 });

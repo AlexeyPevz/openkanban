@@ -31,8 +31,8 @@
       "icons/icon.ico",
       "icons/icon.png"
     ],
-    "resources": [
-      "../../../packages/sidecar/dist/sidecar-bundle.cjs"
-    ]
+    "resources": {
+      "../../../packages/sidecar/dist/sidecar-bundle.cjs": "sidecar-bundle.cjs"
+    }
   }
 }

@@ -47,6 +47,8 @@ export interface StatusWriteInput {
 
 export interface TaskPatch {
   title?: string
+  description?: string
+  priority?: "low" | "medium" | "high"
   metadata?: Record<string, unknown>
   blocked_reason?: string
   updated_at?: string
@@ -59,6 +61,8 @@ export interface CreateTaskInput {
   status: TaskStatus
   source_file: string
   updated_at: string
+  description?: string
+  priority?: "low" | "medium" | "high"
   required_agents?: string[]
   required_skills?: string[]
   resources?: ResourceAssignment[]

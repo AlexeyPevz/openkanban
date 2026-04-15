@@ -60,12 +60,13 @@
 
 <div
   class="shortcuts-overlay"
-  onclick={onClose}
+  onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
   onkeydown={(e) => e.key === 'Escape' && onClose()}
   role="dialog"
+  tabindex="-1"
   aria-label="Keyboard shortcuts"
 >
-  <div class="shortcuts-panel" bind:this={panelEl} onclick={(e) => e.stopPropagation()}>
+  <div class="shortcuts-panel" bind:this={panelEl} role="document">
     <h2>Keyboard Shortcuts</h2>
     <div class="shortcuts-list">
       {#each shortcutsList as shortcut}
