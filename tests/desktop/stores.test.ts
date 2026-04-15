@@ -6,6 +6,7 @@ vi.mock('../../packages/desktop/src/lib/rpc.js', () => ({
   boardApi: { load: vi.fn() },
   taskApi: { move: vi.fn(), create: vi.fn(), update: vi.fn(), get: vi.fn() },
   resourceApi: { discover: vi.fn(), list: vi.fn() },
+  projectApi: { current: vi.fn(), rebind: vi.fn() },
 }));
 
 // Mock @tauri-apps/api/event
@@ -13,8 +14,27 @@ vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(),
 }));
 
-import { boardApi, taskApi, resourceApi } from '../../packages/desktop/src/lib/rpc.js';
+// Mock @tauri-apps/api/core so catalog.ts (used by project-catalog store) can resolve
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn().mockResolvedValue({
+    projectPath: '',
+    name: '',
+    lastOpenedAt: null,
+    source: 'opened',
+    isAvailable: true,
+  }),
+}));
+
+// Mock project-catalog store so switchProject can call upsertOpenedProject
+vi.mock('../../packages/desktop/src/lib/stores/project-catalog.svelte.js', () => ({
+  upsertOpenedProject: vi.fn().mockResolvedValue(undefined),
+  loadProjectCatalog: vi.fn().mockResolvedValue(undefined),
+  getProjectCatalog: vi.fn().mockReturnValue([]),
+}));
+
+import { boardApi, taskApi, resourceApi, projectApi } from '../../packages/desktop/src/lib/rpc.js';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 
 // Board store tests
 import {
@@ -22,6 +42,7 @@ import {
   refreshBoard,
   moveTask,
   createTask,
+  updateTask,
   getBoardState,
   selectTask,
   getSelectedTaskId,
@@ -50,10 +71,21 @@ import {
   type ThemeVars,
 } from '../../packages/desktop/src/lib/stores/theme.svelte.js';
 
+// Project store (for cross-store orchestration tests)
+import {
+  switchProject,
+  getActiveProject,
+  initializeActiveProject,
+} from '../../packages/desktop/src/lib/stores/project.svelte.js';
+
+import { upsertOpenedProject } from '../../packages/desktop/src/lib/stores/project-catalog.svelte.js';
+
 const mockBoardApi = vi.mocked(boardApi);
 const mockTaskApi = vi.mocked(taskApi);
 const mockResourceApi = vi.mocked(resourceApi);
+const mockProjectApi = vi.mocked(projectApi);
 const mockListen = vi.mocked(listen);
+const mockUpsertOpenedProject = vi.mocked(upsertOpenedProject);
 
 describe('board store', () => {
   beforeEach(() => {
@@ -975,5 +1007,239 @@ describe('theme store', () => {
     resetTheme();
     expect(getThemeName()).toBe('opencode');
     expect(getTheme()['--kanban-bg']).toBe('#1a1b26');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Post-switch full-edit flow (Task 017)
+// Proves that after switchProject, create/update/move/status flows remain
+// operational at the store orchestration level.
+// ---------------------------------------------------------------------------
+describe('post-switch full-edit flow', () => {
+  const PROJECT_A_TASKS = [
+    { id: 't-a1', title: 'Task A1', status: 'planned', source_file: 'a1.md', updated_at: '2024-01-01' },
+    { id: 't-a2', title: 'Task A2', status: 'active', source_file: 'a2.md', updated_at: '2024-01-01' },
+  ];
+
+  const PROJECT_B_TASKS = [
+    { id: 't-b1', title: 'Task B1', status: 'planned', source_file: 'b1.md', updated_at: '2024-02-01' },
+    { id: 't-b2', title: 'Task B2', status: 'planned', source_file: 'b2.md', updated_at: '2024-02-01' },
+  ];
+
+  /**
+   * Helper: initialize project-a, load its board into success state,
+   * then switch to project-b so the board refreshes with project-b data.
+   */
+  async function setupSwitchToProjectB(): Promise<void> {
+    // 1. Initialize active project to /project-a
+    mockProjectApi.current.mockResolvedValueOnce({
+      ok: true,
+      data: { directory: '/project-a' },
+    });
+    await initializeActiveProject();
+
+    // 2. Load board with project-a tasks
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: PROJECT_A_TASKS,
+        statuses: ['planned', 'active', 'done'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+    expect(getBoardState().state).toBe('success');
+
+    // 3. Switch to /project-b
+    mockProjectApi.rebind.mockResolvedValueOnce({
+      ok: true,
+      data: { directory: '/project-b', rebound: true },
+    });
+    // refreshBoard will call boardApi.load — return project-b data
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: PROJECT_B_TASKS,
+        statuses: ['planned', 'active', 'done'],
+        diagnostics: [],
+      },
+    });
+
+    const result = await switchProject('/project-b');
+    expect(result).toEqual({ ok: true });
+    expect(getActiveProject()).toBe('/project-b');
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('createTask works against selected project after switchProject', async () => {
+    await setupSwitchToProjectB();
+
+    // Verify board shows project-b data before create
+    const priorState = getBoardState();
+    expect(priorState.state).toBe('success');
+    if (priorState.state === 'success') {
+      expect(priorState.tasks).toHaveLength(2);
+      expect(priorState.tasks[0].id).toBe('t-b1');
+    }
+
+    // Create a new task
+    mockTaskApi.create.mockResolvedValueOnce({
+      ok: true,
+      data: { id: 't-b3', title: 'New on B', status: 'planned' } as any,
+    });
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [
+          ...PROJECT_B_TASKS,
+          { id: 't-b3', title: 'New on B', status: 'planned', source_file: 'b3.md', updated_at: '2024-02-02' },
+        ],
+        statuses: ['planned', 'active', 'done'],
+        diagnostics: [],
+      },
+    });
+
+    const ok = await createTask({ title: 'New on B', status: 'planned' } as any);
+
+    expect(ok).toBe(true);
+    expect(mockTaskApi.create).toHaveBeenCalledTimes(1);
+
+    const state = getBoardState();
+    expect(state.state).toBe('success');
+    if (state.state === 'success') {
+      expect(state.tasks).toHaveLength(3);
+      expect(state.tasks.find((t) => t.id === 't-b3')?.title).toBe('New on B');
+    }
+  });
+
+  it('updateTask works against selected project after switchProject', async () => {
+    await setupSwitchToProjectB();
+
+    // Update task t-b1 title
+    mockTaskApi.update.mockResolvedValueOnce({
+      ok: true,
+      data: { id: 't-b1', title: 'Updated B1', status: 'planned' } as any,
+    });
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [
+          { id: 't-b1', title: 'Updated B1', status: 'planned', source_file: 'b1.md', updated_at: '2024-02-02' },
+          PROJECT_B_TASKS[1],
+        ],
+        statuses: ['planned', 'active', 'done'],
+        diagnostics: [],
+      },
+    });
+
+    const ok = await updateTask('t-b1', { title: 'Updated B1' });
+
+    expect(ok).toBe(true);
+    expect(mockTaskApi.update).toHaveBeenCalledWith('t-b1', { title: 'Updated B1' });
+
+    const state = getBoardState();
+    expect(state.state).toBe('success');
+    if (state.state === 'success') {
+      expect(state.tasks.find((t) => t.id === 't-b1')?.title).toBe('Updated B1');
+    }
+  });
+
+  it('moveTask / status change works against selected project after switchProject', async () => {
+    await setupSwitchToProjectB();
+
+    // Move t-b1 from planned → done
+    mockTaskApi.move.mockResolvedValueOnce({
+      ok: true,
+      data: { id: 't-b1', title: 'Task B1', status: 'done' } as any,
+    });
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: [
+          { id: 't-b1', title: 'Task B1', status: 'done', source_file: 'b1.md', updated_at: '2024-02-02' },
+          PROJECT_B_TASKS[1],
+        ],
+        statuses: ['planned', 'active', 'done'],
+        diagnostics: [],
+      },
+    });
+
+    const ok = await moveTask('t-b1', 'done');
+
+    expect(ok).toBe(true);
+    expect(mockTaskApi.move).toHaveBeenCalledWith('t-b1', 'done');
+
+    // getTasksByStatus should reflect the move
+    expect(getTasksByStatus('done')).toHaveLength(1);
+    expect(getTasksByStatus('done')[0].id).toBe('t-b1');
+    expect(getTasksByStatus('planned')).toHaveLength(1);
+    expect(getTasksByStatus('planned')[0].id).toBe('t-b2');
+  });
+
+  it('board/store state remains consistent after switch — old selection is orphaned', async () => {
+    // Select a task from project-a BEFORE switch
+    mockProjectApi.current.mockResolvedValueOnce({
+      ok: true,
+      data: { directory: '/project-a' },
+    });
+    await initializeActiveProject();
+
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: PROJECT_A_TASKS,
+        statuses: ['planned', 'active', 'done'],
+        diagnostics: [],
+      },
+    });
+    await loadBoard();
+    selectTask('t-a1');
+    expect(getSelectedTask()?.id).toBe('t-a1');
+
+    // Now switch to project-b
+    mockProjectApi.rebind.mockResolvedValueOnce({
+      ok: true,
+      data: { directory: '/project-b', rebound: true },
+    });
+    mockBoardApi.load.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        state: 'success' as const,
+        tasks: PROJECT_B_TASKS,
+        statuses: ['planned', 'active', 'done'],
+        diagnostics: [],
+      },
+    });
+
+    await switchProject('/project-b');
+
+    // Active project updated
+    expect(getActiveProject()).toBe('/project-b');
+
+    // Board shows project-b tasks only
+    const state = getBoardState();
+    expect(state.state).toBe('success');
+    if (state.state === 'success') {
+      expect(state.tasks).toHaveLength(2);
+      expect(state.tasks.every((t) => t.id.startsWith('t-b'))).toBe(true);
+    }
+
+    // Old selectedTaskId still points to t-a1 which no longer exists
+    // in project-b → getSelectedTask should return null
+    expect(getSelectedTaskId()).toBe('t-a1');
+    expect(getSelectedTask()).toBeNull();
+
+    // getTasksByStatus works for new project
+    expect(getTasksByStatus('planned')).toHaveLength(2);
+    expect(getTasksByStatus('active')).toHaveLength(0);
   });
 });

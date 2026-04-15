@@ -19,7 +19,7 @@
 
 <section
   class="column"
-  role="region"
+
   aria-label="{status} column"
   use:droptarget={{ status, onDrop: handleDrop }}
 >

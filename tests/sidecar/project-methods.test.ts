@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import matter from 'gray-matter';
@@ -20,7 +20,7 @@ async function createWorkspace(rootDir: string, boardTitle: string, taskId: stri
 
   await writeFile(
     join(rootDir, '.tasks', 'board.yml'),
-    `id: ${taskId}-board\ntitle: ${boardTitle}\ncolumns:\n  - id: planned\n    title: Planned\n  - id: done\n    title: Done\n`,
+    `id: ${taskId}-board\ntitle: ${boardTitle}\ncolumns:\n  - id: planned\n    title: Planned\n  - id: active\n    title: Active\n  - id: done\n    title: Done\n`,
   );
 
   const taskContent = matter.stringify('', {
@@ -37,6 +37,11 @@ async function createWorkspace(rootDir: string, boardTitle: string, taskId: stri
   await writeFile(join(tasksDir, `${taskId}.md`), taskContent);
 
   await mkdir(join(rootDir, 'skills', skillName), { recursive: true });
+}
+
+async function readTaskFrontmatter(rootDir: string, taskId: string): Promise<Record<string, unknown>> {
+  const rawTask = await readFile(join(rootDir, '.tasks', 'tasks', `${taskId}.md`), 'utf8');
+  return matter(rawTask).data as Record<string, unknown>;
 }
 
 describe('runtime-root method reads', () => {
@@ -163,5 +168,70 @@ describe('project methods', () => {
       methods['project.rebind']({ directory: '/tmp/project-b' }),
     ).rejects.toThrow('restart failed');
     expect(runtime.current).toBe('/tmp/project-a');
+  });
+});
+
+describe('runtime-root task write methods', () => {
+  let projectA: string;
+  let projectB: string;
+
+  beforeEach(async () => {
+    projectA = await mkdtemp(join(tmpdir(), 'runtime-write-a-'));
+    projectB = await mkdtemp(join(tmpdir(), 'runtime-write-b-'));
+
+    await createWorkspace(projectA, 'Project A', 'shared-task', 'project-a-skill');
+    await createWorkspace(projectB, 'Project B', 'shared-task', 'project-b-skill');
+  });
+
+  it('task.create writes into switched runtime root', async () => {
+    const runtime = createProjectRuntime(projectA);
+    const taskMethods = createTaskMethods(runtime);
+
+    runtime.current = projectB;
+    const created = await taskMethods['task.create']({
+      title: 'Switched Create Task',
+      status: 'planned',
+    }) as { id: string };
+
+    const inB = await readTaskFrontmatter(projectB, created.id);
+    expect(inB.title).toBe('Switched Create Task');
+
+    await expect(
+      readFile(join(projectA, '.tasks', 'tasks', `${created.id}.md`), 'utf8'),
+    ).rejects.toThrow();
+  });
+
+  it('task.update writes into switched runtime root', async () => {
+    const runtime = createProjectRuntime(projectA);
+    const taskMethods = createTaskMethods(runtime);
+
+    runtime.current = projectB;
+    await taskMethods['task.update']({
+      id: 'shared-task',
+      title: 'Updated In Project B',
+    });
+
+    const inB = await readTaskFrontmatter(projectB, 'shared-task');
+    expect(inB.title).toBe('Updated In Project B');
+
+    const inA = await readTaskFrontmatter(projectA, 'shared-task');
+    expect(inA.title).toBe('shared-task title');
+  });
+
+  it('task.move writes into switched runtime root', async () => {
+    const runtime = createProjectRuntime(projectA);
+    const taskMethods = createTaskMethods(runtime);
+
+    runtime.current = projectB;
+    await taskMethods['task.move']({
+      id: 'shared-task',
+      status: 'active',
+    });
+
+    const inB = await readTaskFrontmatter(projectB, 'shared-task');
+    expect(inB.status).toBe('active');
+
+    const inA = await readTaskFrontmatter(projectA, 'shared-task');
+    expect(inA.status).toBe('planned');
   });
 });

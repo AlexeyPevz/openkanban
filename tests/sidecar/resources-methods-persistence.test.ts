@@ -83,4 +83,66 @@ describe('resources methods persistence', () => {
     const task = await taskMethods['task.get']({ id: 'sample-task' }) as { resources: Array<{ kind: string; name: string; required: boolean }> };
     expect(task.resources).toEqual([]);
   });
+
+  it('resources.assign writes into switched runtime root', async () => {
+    const rootDirA = rootDir;
+    const rootDirB = await createWorkspace();
+    rootDir = rootDirB;
+
+    const runtime = { current: rootDirA };
+    const resourcesMethods = createResourceMethods(runtime);
+    const taskMethods = createTaskMethods(runtime);
+
+    runtime.current = rootDirB;
+    await resourcesMethods['resources.assign']({
+      taskId: 'sample-task',
+      kind: 'skill',
+      name: 'testing-tdd',
+    });
+
+    const rawB = await readFile(join(rootDirB, '.tasks', 'tasks', 'sample-task.md'), 'utf8');
+    const parsedB = matter(rawB);
+    expect(parsedB.data.resources).toEqual([
+      { kind: 'skill', name: 'testing-tdd', required: true },
+    ]);
+
+    const rawA = await readFile(join(rootDirA, '.tasks', 'tasks', 'sample-task.md'), 'utf8');
+    const parsedA = matter(rawA);
+    expect(parsedA.data.resources).toBeUndefined();
+
+    const task = await taskMethods['task.get']({ id: 'sample-task' }) as { resources: Array<{ kind: string; name: string; required: boolean }> };
+    expect(task.resources).toEqual([
+      { kind: 'skill', name: 'testing-tdd', required: true },
+    ]);
+  });
+
+  it('resources.unassign writes into switched runtime root', async () => {
+    const rootDirA = rootDir;
+    const rootDirB = await createWorkspace([
+      { kind: 'agent', name: 'backend', required: true },
+    ]);
+    rootDir = rootDirB;
+
+    const runtime = { current: rootDirA };
+    const resourcesMethods = createResourceMethods(runtime);
+    const taskMethods = createTaskMethods(runtime);
+
+    runtime.current = rootDirB;
+    await resourcesMethods['resources.unassign']({
+      taskId: 'sample-task',
+      kind: 'agent',
+      name: 'backend',
+    });
+
+    const rawB = await readFile(join(rootDirB, '.tasks', 'tasks', 'sample-task.md'), 'utf8');
+    const parsedB = matter(rawB);
+    expect(parsedB.data.resources).toBeUndefined();
+
+    const rawA = await readFile(join(rootDirA, '.tasks', 'tasks', 'sample-task.md'), 'utf8');
+    const parsedA = matter(rawA);
+    expect(parsedA.data.resources).toBeUndefined();
+
+    const task = await taskMethods['task.get']({ id: 'sample-task' }) as { resources: Array<{ kind: string; name: string; required: boolean }> };
+    expect(task.resources).toEqual([]);
+  });
 });
