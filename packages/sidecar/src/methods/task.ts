@@ -5,9 +5,13 @@ import {
   updateTask,
   updateTaskStatus,
   canTransition,
+  TaskPrioritySchema,
+  ResourceAssignmentSchema,
   TaskStatusSchema,
 } from '@openkanban/core';
 import type { MethodRegistry } from './index.js';
+import type { ProjectRootInput } from '../runtime.js';
+import { getProjectRoot } from '../runtime.js';
 
 // --- Zod param schemas ---
 
@@ -20,6 +24,9 @@ const TaskGetParamsSchema = z.object({
 const TaskCreateParamsSchema = z.object({
   title: z.string().min(1),
   status: TaskStatusSchema.optional(),
+  description: z.string().optional(),
+  priority: TaskPrioritySchema.optional(),
+  resources: z.array(ResourceAssignmentSchema).optional(),
 }).strict();
 
 const TaskMoveParamsSchema = z.object({
@@ -30,6 +37,9 @@ const TaskMoveParamsSchema = z.object({
 const TaskUpdateParamsSchema = z.object({
   id: z.string().min(1),
   title: z.string().optional(),
+  description: z.string().optional(),
+  priority: TaskPrioritySchema.optional(),
+  resources: z.array(ResourceAssignmentSchema).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).strict();
 
@@ -43,17 +53,19 @@ function validate<T>(schema: z.ZodType<T>, params: unknown, method: string): T {
   return result.data;
 }
 
-export function createTaskMethods(rootDir: string): MethodRegistry {
-  const repo = new TaskMarkdownRepository(rootDir);
+export function createTaskMethods(root: ProjectRootInput): MethodRegistry {
+  const getRepo = () => new TaskMarkdownRepository(getProjectRoot(root));
 
   return {
     'task.list': async (params) => {
       validate(TaskListParamsSchema, params, 'task.list');
+      const repo = getRepo();
       return repo.loadTasks();
     },
 
     'task.get': async (params) => {
       const { id } = validate(TaskGetParamsSchema, params, 'task.get');
+      const repo = getRepo();
       const task = await repo.loadTaskById(id);
       if (!task) {
         throw new Error(`Task not found: ${id}`);
@@ -62,12 +74,20 @@ export function createTaskMethods(rootDir: string): MethodRegistry {
     },
 
     'task.create': async (params) => {
-      const { title, status } = validate(TaskCreateParamsSchema, params, 'task.create');
-      return createTask(repo, { title, status: status ?? 'planned' });
+      const { title, status, description, priority, resources } = validate(TaskCreateParamsSchema, params, 'task.create');
+      const repo = getRepo();
+      return createTask(repo, {
+        title,
+        status: status ?? 'planned',
+        description,
+        priority,
+        resources,
+      });
     },
 
     'task.move': async (params) => {
       const { id, status } = validate(TaskMoveParamsSchema, params, 'task.move');
+      const repo = getRepo();
       const task = await repo.loadTaskById(id);
       if (!task) {
         throw new Error(`Task not found: ${id}`);
@@ -81,6 +101,7 @@ export function createTaskMethods(rootDir: string): MethodRegistry {
 
     'task.update': async (params) => {
       const { id, ...patch } = validate(TaskUpdateParamsSchema, params, 'task.update');
+      const repo = getRepo();
       return updateTask(repo, id, patch);
     },
   };

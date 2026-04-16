@@ -7,12 +7,16 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     environment: "node",
+    // Vitest runtime supports environmentMatchGlobs here; current TS types lag behind.
+    // @ts-expect-error environmentMatchGlobs is a valid Vitest option in runtime.
     environmentMatchGlobs: [
       ["tests/ui/**/*.test.ts", "happy-dom"],
       ["**/tests/desktop/stores*.test.ts", "happy-dom"],
+      ["**/tests/desktop/project-sidebar.test.ts", "happy-dom"],
     ],
   },
   resolve: {
+    conditions: process.env.VITEST ? ['browser'] : [],
     alias: {
       "@openkanban/core": resolve(__dirname, "packages/core/src/index.ts"),
       "@openkanban/core/resources/normalize": resolve(__dirname, "packages/core/src/resources/normalize.ts"),

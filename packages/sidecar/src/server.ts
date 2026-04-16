@@ -2,6 +2,8 @@ import * as readline from 'node:readline';
 import type { MethodRegistry } from './methods/index.js';
 import { FileWatcher } from './watcher.js';
 import { sendNotification } from './notifications.js';
+import type { ProjectRuntime } from './runtime.js';
+import { createProjectMethods } from './methods/project.js';
 
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -48,6 +50,7 @@ export interface StartServerOptions {
   methods: MethodRegistry;
   projectDir?: string;
   watch?: boolean;
+  projectRuntime?: ProjectRuntime;
 }
 
 function isOptions(v: unknown): v is StartServerOptions {
@@ -61,31 +64,63 @@ export function startServer(input: MethodRegistry | StartServerOptions): void {
   let methods: MethodRegistry;
   let projectDir: string | undefined;
   let enableWatch: boolean | undefined;
+  let projectRuntime: ProjectRuntime | undefined;
 
   if (isOptions(input)) {
     methods = input.methods;
     projectDir = input.projectDir;
     enableWatch = input.watch;
+    projectRuntime = input.projectRuntime;
   } else {
     methods = input;
   }
-  const dispatch = createRpcDispatcher(methods);
+
+  if (!projectDir && projectRuntime) {
+    projectDir = projectRuntime.current;
+  }
+
   const rl = readline.createInterface({ input: process.stdin });
 
   // Start file watcher if projectDir is provided and watch is enabled
   let watcher: FileWatcher | undefined;
+  const createWatcher = (dir: string): FileWatcher => new FileWatcher({
+    projectDir: dir,
+    onTaskChanged: (taskId, changeType) => {
+      sendNotification('task.changed', { taskId, changeType });
+    },
+    onBoardChanged: () => {
+      sendNotification('board.changed', {});
+    },
+  });
+
   if (projectDir && enableWatch !== false) {
-    watcher = new FileWatcher({
-      projectDir,
-      onTaskChanged: (taskId, changeType) => {
-        sendNotification('task.changed', { taskId, changeType });
-      },
-      onBoardChanged: () => {
-        sendNotification('board.changed', {});
-      },
-    });
+    watcher = createWatcher(projectDir);
     watcher.start();
   }
+
+  const restartWatcher = async (directory: string): Promise<void> => {
+    if (enableWatch === false) {
+      return;
+    }
+    if (watcher) {
+      await watcher.stop();
+      watcher = undefined;
+    }
+    const nextWatcher = createWatcher(directory);
+    nextWatcher.start();
+    watcher = nextWatcher;
+  };
+
+  if (projectRuntime) {
+    methods = {
+      ...methods,
+      ...createProjectMethods(projectRuntime, {
+        restartWatcher,
+      }),
+    };
+  }
+
+  const dispatch = createRpcDispatcher(methods);
 
   rl.on('line', async (line) => {
     try {

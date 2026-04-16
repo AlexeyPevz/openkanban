@@ -5,7 +5,7 @@
   let task = $derived(getSelectedTask());
   let resources = $derived(task ? getTaskResources(task) : []);
 
-  let closeBtn: HTMLButtonElement;
+  let closeBtn = $state<HTMLButtonElement>(null!);
 
   // Auto-focus close button when task panel opens
   $effect(() => {
@@ -17,16 +17,17 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') close();
+    if (task && e.key === 'Escape') close();
   }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 {#if task}
   <aside
     class="details-panel"
-    role="complementary"
     aria-label="Task details: {task.title}"
-    onkeydown={handleKeydown}
+    tabindex="-1"
   >
     <div class="details-header">
       <h2>{task.title}</h2>
@@ -35,34 +36,34 @@
 
     <div class="details-body">
       <div class="field">
-        <label>Status</label>
+        <div class="field-label">Status</div>
         <span class="status-badge">{task.status}</span>
       </div>
 
       {#if task.priority}
         <div class="field">
-          <label>Priority</label>
+          <div class="field-label">Priority</div>
           <span>{task.priority}</span>
         </div>
       {/if}
 
       {#if task.description}
         <div class="field">
-          <label>Description</label>
+          <div class="field-label">Description</div>
           <p>{task.description}</p>
         </div>
       {/if}
 
       {#if task.blocked_reason}
         <div class="field blocked">
-          <label>Blocked</label>
+          <div class="field-label">Blocked</div>
           <p>{task.blocked_reason}</p>
         </div>
       {/if}
 
       {#if resources.length > 0}
         <div class="field">
-          <label>Resources</label>
+          <div class="field-label">Resources</div>
           <div class="resource-list">
             {#each resources as res}
               <span class="resource-tag">
@@ -76,14 +77,14 @@
 
       {#if task.source_file}
         <div class="field">
-          <label>Source</label>
+          <div class="field-label">Source</div>
           <code>{task.source_file}</code>
         </div>
       {/if}
 
       {#if task.artifacts?.length}
         <div class="field">
-          <label>Artifacts</label>
+          <div class="field-label">Artifacts</div>
           <ul>
             {#each task.artifacts as artifact}
               <li>{artifact}</li>
@@ -139,7 +140,7 @@
     margin-bottom: 16px;
   }
 
-  .field label {
+  .field-label {
     display: block;
     font-size: 0.75rem;
     text-transform: uppercase;

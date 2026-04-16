@@ -4,9 +4,9 @@
 
 ## Статус
 
-- Product baseline восстановлен и утверждён на основе `.tasks/recovered/session-recovery-kanban-2026-03-23.md`
-- Этот doc pack переводит baseline в рабочие документы для планирования и кодинга
-- После утверждения пользователем этот пакет становится source of truth для разработки MVP
+- Product baseline восстановлен из `.tasks/recovered/session-recovery-kanban-2026-03-23.md`
+- Этот doc pack — **исторический baseline планирования**. Для актуальной информации по использованию см. [USAGE.md](USAGE.md)
+- Текущая реализация покрывает plugin (6 tools), core domain, sidecar JSON-RPC и desktop companion app
 
 ## Состав
 
@@ -25,7 +25,7 @@
 
 ## Ключевая verified оговорка
 
-В локально проверенном `@opencode-ai/plugin@1.3.0` подтверждены plugin hooks, tool definitions и shell integration, но не подтверждён отдельный публичный UI API для прямой встройки host chrome overlay. Поэтому MVP design фиксирует:
+В проверенном `@opencode-ai/plugin` (текущая зависимость: `^1.3.2`) подтверждены plugin hooks, tool definitions и shell integration, но не подтверждён публичный UI API для прямой встройки host chrome overlay. Архитектура решает это через:
 
 1. целевой UX — host-native overlay/panel;
 2. обязательный validation gate на реальную UI extension capability OpenCode;

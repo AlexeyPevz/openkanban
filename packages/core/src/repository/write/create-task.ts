@@ -1,10 +1,14 @@
 import type { TaskStatus } from "../../types.js"
 import type { TaskCard } from "../../types.js"
+import type { ResourceAssignment } from "../../resources/types.js"
 import type { TaskRepository } from "../contracts.js"
 
 export interface CreateTaskRequest {
   title: string
   status: TaskStatus
+  description?: string
+  priority?: "low" | "medium" | "high"
+  resources?: ResourceAssignment[]
 }
 
 function slugify(value: string): string {
@@ -25,5 +29,8 @@ export async function createTask(repository: TaskRepository, input: CreateTaskRe
     status: input.status,
     source_file: sourceFile,
     updated_at: new Date().toISOString(),
+    description: input.description,
+    priority: input.priority,
+    resources: input.resources,
   })
 }

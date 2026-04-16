@@ -127,17 +127,18 @@
 
 <div
   class="form-overlay"
-  onclick={onClose}
+  onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
   onkeydown={(e) => e.key === 'Escape' && onClose()}
   role="dialog"
+  tabindex="-1"
   aria-label="{isEdit ? 'Edit' : 'Create'} task"
 >
-  <form class="task-form" bind:this={formEl} onclick={(e) => e.stopPropagation()} onsubmit={handleSubmit}>
+  <form class="task-form" bind:this={formEl} onsubmit={handleSubmit}>
     <h2>{isEdit ? 'Edit Task' : 'New Task'}</h2>
 
     <div class="form-field">
       <label for="title">Title</label>
-      <input id="title" type="text" bind:value={title} required autofocus />
+      <input id="title" type="text" bind:value={title} required />
     </div>
 
     <div class="form-field">
@@ -167,8 +168,8 @@
     </div>
 
     {#if getResources().length > 0}
-      <div class="form-field">
-        <label>Resources</label>
+      <fieldset class="form-field">
+        <legend>Resources</legend>
         <div class="resource-checkboxes">
           {#each getResources() as res}
             <label class="resource-check">
@@ -181,7 +182,7 @@
             </label>
           {/each}
         </div>
-      </div>
+      </fieldset>
     {/if}
 
     <div class="form-actions">
@@ -225,11 +226,16 @@
     margin-bottom: 16px;
   }
 
-  .form-field label {
+  .form-field label,
+  .form-field legend {
     display: block;
     font-size: 0.8rem;
     color: var(--kanban-text-secondary);
     margin-bottom: 4px;
+  }
+
+  .form-field legend {
+    padding: 0;
   }
 
   .form-field input,
