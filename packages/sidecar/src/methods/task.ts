@@ -43,14 +43,18 @@ const TaskUpdateParamsSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).strict();
 
-function validate<T>(schema: z.ZodType<T>, params: unknown, method: string): T {
+function validate<S extends { safeParse: (input: unknown) => { success: true; data: unknown } | { success: false; error: z.ZodError } }>(
+  schema: S,
+  params: unknown,
+  method: string,
+): S extends { safeParse: (input: unknown) => { success: true; data: infer T } | { success: false; error: z.ZodError } } ? T : never {
   const result = schema.safeParse(params);
   if (!result.success) {
     const err = new Error(`Invalid params for ${method}: ${result.error.issues.map((i) => i.message).join(', ')}`);
     (err as unknown as Record<string, unknown>).code = -32602;
     throw err;
   }
-  return result.data;
+  return result.data as S extends { safeParse: (input: unknown) => { success: true; data: infer T } | { success: false; error: z.ZodError } } ? T : never;
 }
 
 export function createTaskMethods(root: ProjectRootInput): MethodRegistry {
